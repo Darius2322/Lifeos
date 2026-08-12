@@ -277,13 +277,14 @@ nav.tabbar{
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 const DB_NAME = "lifeos";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
 // travel (trips/itinerary/expenses), places/bucket list, timeline, importantDates.
+// Phase 3 adds: sleep log, on-device app-usage log, location log.
 // Bumping DB_VERSION triggers onupgradeneeded below, which only *adds* missing
-// stores — existing Phase 1 data is untouched.
+// stores — existing data from earlier phases is untouched.
 const STORES = [
   {name:"profile", key:"id"},
   {name:"settings", key:"id"},
@@ -317,7 +318,10 @@ const STORES = [
   {name:"tripExpenses", key:"id", indexes:["tripId"]},
   {name:"places", key:"id", indexes:["status"]},
   {name:"timeline", key:"id", indexes:["date","category"]},
-  {name:"importantDates", key:"id", indexes:["date"]}
+  {name:"importantDates", key:"id", indexes:["date"]},
+  {name:"sleepLogs", key:"id", indexes:["date"]},
+  {name:"appUsageLogs", key:"id", indexes:["date"]},
+  {name:"locationLogs", key:"id", indexes:["date"]}
 ];
 
 const DB = {
@@ -357,7 +361,7 @@ const DB = {
 const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const todayStr = ()=> new Date().toISOString().slice(0,10);
 const nowISO = ()=> new Date().toISOString();
-let SETTINGS = {id:"main", name:"Darius", currency:"KSh", theme:"dark", pinHash:null, lockTimeoutMin:2, weekStart:1, notificationsOn:false, webauthnId:null};
+let SETTINGS = {id:"main", name:"Darius", currency:"KSh", theme:"dark", pinHash:null, lockTimeoutMin:2, weekStart:1, notificationsOn:false, webauthnId:null, autoLocationOn:false};
 
 function fmtMoney(n){
   const v = Number(n||0);
@@ -409,10 +413,12 @@ const MODULES = {
     label:"Reminders", icon:"⏰", color:"var(--blue)", store:"reminders",
     fields:[
       {key:"title", label:"Reminder", type:"text", required:true},
-      {key:"dueDate", label:"When", type:"date", required:true},
+      {key:"dueDate", label:"Date", type:"date", required:true},
+      {key:"time", label:"Time (optional)", type:"time"},
+      {key:"repeat", label:"Repeats", type:"select", options:["None","Daily","Weekly","Monthly","Yearly"]},
       {key:"notes", label:"Notes", type:"textarea"}
     ],
-    title:r=>r.title, sub:r=> r.dueDate? fmtDate(r.dueDate): "", checkable:true
+    title:r=>r.title, sub:r=> (r.dueDate? fmtDate(r.dueDate): "")+(r.time?" • "+r.time:"")+(r.repeat&&r.repeat!=="None"?" • "+r.repeat:""), checkable:true
   },
   notes: {
     label:"Notes", icon:"📌", color:"var(--violet)", store:"notes",
@@ -609,8 +615,40 @@ const MODULES = {
       {key:"notes", label:"Notes", type:"textarea"}
     ],
     title:r=>r.title, sub:r=> fmtDate(r.date)+(r.recurring==="Yes"?" • yearly":"")
+  },
+  sleepLogs: {
+    label:"Sleep", icon:"😴", color:"var(--violet)", store:"sleepLogs",
+    fields:[
+      {key:"date", label:"Wake-up date", type:"date", required:true},
+      {key:"bedTime", label:"Went to bed", type:"time"},
+      {key:"wakeTime", label:"Woke up", type:"time"},
+      {key:"quality", label:"Sleep quality (1-5)", type:"select", options:["","1","2","3","4","5"]},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>fmtDate(r.date), sub:r=>{
+      if(!r.bedTime || !r.wakeTime) return r.quality? "Quality "+r.quality+"/5" : "";
+      const [bh,bm]=r.bedTime.split(":").map(Number), [wh,wm]=r.wakeTime.split(":").map(Number);
+      let mins = (wh*60+wm) - (bh*60+bm); if(mins<0) mins += 24*60;
+      return r.bedTime+" → "+r.wakeTime+" • "+(mins/60).toFixed(1)+"h"+(r.quality?" • quality "+r.quality+"/5":"");
+    }
   }
 };
+
+/* =========================================================================
+   REMINDERS — recurrence helper, shared by Plan tab, Calendar, and notifications
+   ========================================================================= */
+function reminderOccursOn(r, dateStr){
+  if(!r.dueDate) return false;
+  if(r.dueDate===dateStr) return true;
+  if(!r.repeat || r.repeat==="None") return false;
+  if(dateStr < r.dueDate) return false;
+  const rd = new Date(r.dueDate+"T00:00:00"), dd = new Date(dateStr+"T00:00:00");
+  if(r.repeat==="Daily") return true;
+  if(r.repeat==="Weekly") return rd.getDay()===dd.getDay();
+  if(r.repeat==="Monthly") return rd.getDate()===dd.getDate();
+  if(r.repeat==="Yearly") return rd.getMonth()===dd.getMonth() && rd.getDate()===dd.getDate();
+  return false;
+}
 
 /* =========================================================================
    HABITS — custom logic (streaks) beyond generic CRUD
@@ -782,7 +820,7 @@ async function renderHome(){
   ]);
   const today = todayStr();
   const todaysTasks = tasks.filter(t=>!t.done && (t.dueDate===today || !t.dueDate));
-  const todaysReminders = reminders.filter(r=>!r.done && r.dueDate===today);
+  const todaysReminders = reminders.filter(r=>!r.done && reminderOccursOn(r, today));
   const spentToday = expenses.filter(e=>e.date===today).reduce((s,e)=>s+Number(e.amount||0),0);
   const activeGoals = goals.filter(g=>g.status!=="Completed").length;
   const subsDue = subs.filter(s=> s.nextPaymentDate && daysUntil(s.nextPaymentDate)!=null && daysUntil(s.nextPaymentDate)>=0 && daysUntil(s.nextPaymentDate)<=7).length;
@@ -1057,6 +1095,12 @@ function renderMore(){
   document.getElementById("topbar-title").textContent = "More";
   const el2 = document.getElementById("screen-more");
   el2.innerHTML = `
+    <div class="section-label">About Me</div>
+    <div class="tile-grid">
+      <div class="tile" data-custom="__profile__"><div class="em">🧑</div><div class="l">Profile</div><div class="d">Birthday, education, hobbies, fears</div></div>
+      <div class="tile" data-open="sleepLogs"><div class="em">😴</div><div class="l">Sleep</div></div>
+      <div class="tile" data-custom="__locations__"><div class="em">📍</div><div class="l">Location log</div></div>
+    </div>
     <div class="section-label">Track</div>
     <div class="tile-grid">
       <div class="tile" data-open="books"><div class="em">📕</div><div class="l">Reading</div></div>
@@ -1114,7 +1158,9 @@ const CUSTOM_SCREENS = {
   "__documents__": {label:"Documents", render:renderDocumentsScreen},
   "__timeline__": {label:"Timeline", render:renderTimelineScreen},
   "__achievements__": {label:"Achievements", render:renderAchievementsScreen},
-  "__calendar__": {label:"Calendar", render:renderCalendarScreen}
+  "__calendar__": {label:"Calendar", render:renderCalendarScreen},
+  "__profile__": {label:"About Me", render:renderProfileScreen},
+  "__locations__": {label:"Location log", render:renderLocationsScreen}
 };
 async function renderModuleScreen(){
   const top = STATE.stack[STATE.stack.length-1];
@@ -1535,10 +1581,10 @@ async function renderCalendarScreen(el2){
   function itemsOnDay(dateStr){
     const md = dateStr.slice(5);
     const out = [];
-    tasks.forEach(t=> t.dueDate===dateStr && out.push({icon:"📝", label:t.title}));
-    reminders.forEach(r=> r.dueDate===dateStr && out.push({icon:"⏰", label:r.title}));
+    tasks.forEach(t=> t.dueDate===dateStr && out.push({icon:"📝", label:t.title, type:"tasks", id:t.id}));
+    reminders.forEach(r=> reminderOccursOn(r, dateStr) && out.push({icon:"⏰", label:r.title, type:"reminders", id:r.id}));
     dates.forEach(d=>{
-      if(d.date===dateStr || (d.recurring==="Yes" && d.date && d.date.slice(5)===md)) out.push({icon:"🎉", label:d.title});
+      if(d.date===dateStr || (d.recurring==="Yes" && d.date && d.date.slice(5)===md)) out.push({icon:"🎉", label:d.title, type:"importantDates", id:d.id});
     });
     return out;
   }
@@ -1589,10 +1635,21 @@ async function renderCalendarScreen(el2){
 function openDayDetail(dateStr, items, el2){
   openSheet(`
     <div class="sheet-title">${fmtDate(dateStr)}</div>
-    ${items.length? `<div class="card" style="margin-top:12px;">${items.map(i=>`<div class="row"><div class="row-icon">${i.icon}</div><div class="row-body"><div class="row-title">${esc(i.label)}</div></div></div>`).join("")}</div>`:`<p style="font-size:13px; color:var(--fog);">Nothing on this day yet.</p>`}
+    <p class="field-hint" style="margin-top:0;">Tap an item to edit it — including moving it to a different date.</p>
+    ${items.length? `<div class="card" style="margin-top:8px;">${items.map(i=>`<div class="row" data-item="${i.type}|${i.id}"><div class="row-icon">${i.icon}</div><div class="row-body"><div class="row-title">${esc(i.label)}</div></div><div style="color:var(--fog-dim); font-size:16px;">›</div></div>`).join("")}</div>`:`<p style="font-size:13px; color:var(--fog);">Nothing on this day yet.</p>`}
     <button class="btn" id="dd-add" style="margin-top:14px;">+ Add special date</button>
   `);
   document.getElementById("dd-add").addEventListener("click", ()=>{ closeSheet(); openImportantDateForm(null, dateStr, el2); });
+  document.querySelectorAll("[data-item]").forEach(n=> n.addEventListener("click", async ()=>{
+    const [type, id] = n.dataset.item.split("|");
+    closeSheet();
+    if(type==="importantDates"){
+      const rec = await DB.get("importantDates", id);
+      openImportantDateForm(rec, rec.date, el2);
+    } else {
+      pushModule("form", type, id);
+    }
+  }));
 }
 function openImportantDateForm(existing, defaultDate, el2){
   openSheet(`
@@ -1646,6 +1703,193 @@ async function renderAchievementsScreen(el2){
 }
 
 /* =========================================================================
+   ABOUT ME — birthday, education, hobbies, fears, and open-ended personal
+   facts. Everything here stays in IndexedDB on this device, same as
+   everything else in the app.
+   ========================================================================= */
+async function renderProfileScreen(el2){
+  const p = (await DB.get("profile", "main")) || {id:"main", customFacts:[]};
+  if(!p.customFacts) p.customFacts = [];
+  const usageToday = await getAppUsageMinutes(todayStr());
+  const usage7 = await getAppUsageMinutes7d();
+
+  function factsHTML(){
+    return p.customFacts.map((f,i)=>`
+      <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:10px;">
+        <div style="flex:1;"><label style="margin:0 0 4px;">Label</label><input class="pf-label" data-i="${i}" value="${esc(f.label)}" placeholder="e.g. Favorite food"></div>
+        <div style="flex:1;"><label style="margin:0 0 4px;">Value</label><input class="pf-value" data-i="${i}" value="${esc(f.value)}"></div>
+        <button class="btn danger sm pf-remove" data-i="${i}" style="padding:11px 12px;">✕</button>
+      </div>`).join("");
+  }
+
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <div class="card">
+      <h2><span class="em">🧑</span>About Me</h2>
+      <label>Birthday</label><input id="pf-birthday" type="date" value="${p.birthday||''}">
+      <label>Primary school</label><input id="pf-primary" value="${esc(p.primarySchool||'')}">
+      <label>High school</label><input id="pf-highschool" value="${esc(p.highSchool||'')}">
+      <label>College / university</label><input id="pf-college" value="${esc(p.college||'')}">
+      <label>Hobbies</label><textarea id="pf-hobbies" placeholder="One per line, or comma-separated">${esc(p.hobbies||'')}</textarea>
+      <label>Fears</label><textarea id="pf-fears">${esc(p.fears||'')}</textarea>
+    </div>
+
+    <div class="section-label">More about me</div>
+    <div class="card">
+      <div id="pf-facts">${factsHTML()}</div>
+      <button class="btn ghost sm" id="pf-add-fact">+ Add a fact</button>
+    </div>
+    <button class="btn" id="pf-save" style="margin-top:14px;">Save profile</button>
+
+    <div class="section-label">On-device app usage</div>
+    <div class="card">
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${usageToday}m</div><div class="l">in Life OS today</div></div>
+        <div class="stat"><div class="n">${usage7}m</div><div class="l">last 7 days</div></div>
+      </div>
+      <p class="field-hint" style="margin-top:10px;">This only measures time spent inside Life OS itself — a web app has no access to your phone's overall screen time or other apps' usage.</p>
+    </div>
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  el2.querySelector("#pf-add-fact").addEventListener("click", ()=>{
+    p.customFacts.push({label:"", value:""});
+    document.getElementById("pf-facts").innerHTML = factsHTML();
+    wireFactInputs();
+  });
+  function wireFactInputs(){
+    document.querySelectorAll(".pf-label").forEach(inp=> inp.addEventListener("input", ()=>{ p.customFacts[Number(inp.dataset.i)].label = inp.value; }));
+    document.querySelectorAll(".pf-value").forEach(inp=> inp.addEventListener("input", ()=>{ p.customFacts[Number(inp.dataset.i)].value = inp.value; }));
+    document.querySelectorAll(".pf-remove").forEach(btn=> btn.addEventListener("click", ()=>{
+      p.customFacts.splice(Number(btn.dataset.i),1);
+      document.getElementById("pf-facts").innerHTML = factsHTML();
+      wireFactInputs();
+    }));
+  }
+  wireFactInputs();
+  el2.querySelector("#pf-save").addEventListener("click", async ()=>{
+    p.birthday = document.getElementById("pf-birthday").value;
+    p.primarySchool = document.getElementById("pf-primary").value;
+    p.highSchool = document.getElementById("pf-highschool").value;
+    p.college = document.getElementById("pf-college").value;
+    p.hobbies = document.getElementById("pf-hobbies").value;
+    p.fears = document.getElementById("pf-fears").value;
+    p.customFacts = p.customFacts.filter(f=>f.label.trim()||f.value.trim());
+    await DB.put("profile", p);
+    toast("Profile saved");
+    // Auto-create a yearly recurring birthday reminder, if one isn't already there.
+    if(p.birthday){
+      const existingBday = (await DB.getAll("importantDates")).find(d=>d.category==="Birthday" && d.title.toLowerCase().includes((SETTINGS.name||"my").toLowerCase()));
+      if(!existingBday){
+        await DB.add("importantDates", {id:uid(), title:(SETTINGS.name||"My")+"'s birthday", date:p.birthday, category:"Birthday", recurring:"Yes", notes:"", createdAt:nowISO()});
+      }
+    }
+  });
+}
+
+/* =========================================================================
+   LOCATION LOG — captures device location only while the app is open
+   (foreground). True continuous background tracking isn't possible for a
+   web app with no native permissions/backend, so this logs on-demand plus
+   once automatically each time you open the app (if you've granted access).
+   ========================================================================= */
+function captureLocation(){
+  return new Promise((resolve,reject)=>{
+    if(!("geolocation" in navigator)){ reject(new Error("Geolocation not supported")); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos=> resolve({lat:pos.coords.latitude, lng:pos.coords.longitude, accuracy:pos.coords.accuracy}),
+      err=> reject(err),
+      {enableHighAccuracy:false, timeout:10000, maximumAge:60000}
+    );
+  });
+}
+async function logLocationNow(el2){
+  try{
+    const pos = await captureLocation();
+    const label = prompt("Label this place (optional):") || "";
+    await DB.add("locationLogs", {id:uid(), date:todayStr(), time:new Date().toTimeString().slice(0,5), lat:pos.lat, lng:pos.lng, label, auto:false});
+    toast("Location logged");
+    if(el2) renderLocationsScreen(el2);
+  }catch(e){ toast("Couldn't get location — check permission"); }
+}
+async function maybeAutoLogLocation(){
+  if(!SETTINGS.autoLocationOn) return;
+  const today = todayStr();
+  if(SETTINGS._lastAutoLocation===today) return;
+  try{
+    if(navigator.permissions){
+      const perm = await navigator.permissions.query({name:"geolocation"});
+      if(perm.state!=="granted") return;
+    }
+    const pos = await captureLocation();
+    await DB.add("locationLogs", {id:uid(), date:today, time:new Date().toTimeString().slice(0,5), lat:pos.lat, lng:pos.lng, label:"", auto:true});
+    SETTINGS._lastAutoLocation = today;
+    await DB.put("settings", SETTINGS);
+  }catch(e){ /* silent — permission not granted or unavailable */ }
+}
+async function renderLocationsScreen(el2){
+  const logs = (await DB.getAll("locationLogs")).sort((a,b)=> (b.date+b.time)<(a.date+a.time)?-1:1);
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <p class="field-hint" style="margin-top:0;">Only logged while Life OS is open on this device — there's no way for a web app to track location continuously in the background.</p>
+    <div class="btn-row">
+      <button class="btn" id="loc-now">📍 Log my location now</button>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <label style="margin-top:0;">Auto-log once per day when I open the app</label>
+      <div class="chips">
+        <span class="chip ${SETTINGS.autoLocationOn?'active':''}" id="loc-auto-on">On</span>
+        <span class="chip ${!SETTINGS.autoLocationOn?'active':''}" id="loc-auto-off">Off</span>
+      </div>
+    </div>
+    <div class="section-label">History</div>
+    <div class="card">
+      ${logs.length? logs.map(l=>`
+        <div class="row"><div class="row-icon">📍</div><div class="row-body"><div class="row-title">${esc(l.label||"Unnamed place")}${l.auto?' <span style="color:var(--fog-dim); font-weight:400;">· auto</span>':''}</div><div class="row-sub">${fmtDate(l.date)} ${l.time||""} • ${l.lat.toFixed(4)}, ${l.lng.toFixed(4)}</div></div>
+        <a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener" style="color:var(--gold); font-size:12px; text-decoration:none;">Map</a></div>
+      `).join("") : `<div class="empty"><span class="em">📍</span><p>No locations logged yet.</p></div>`}
+    </div>
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  el2.querySelector("#loc-now").addEventListener("click", ()=> logLocationNow(el2));
+  el2.querySelector("#loc-auto-on").addEventListener("click", async ()=>{ SETTINGS.autoLocationOn=true; await DB.put("settings",SETTINGS); renderLocationsScreen(el2); });
+  el2.querySelector("#loc-auto-off").addEventListener("click", async ()=>{ SETTINGS.autoLocationOn=false; await DB.put("settings",SETTINGS); renderLocationsScreen(el2); });
+}
+
+/* =========================================================================
+   ON-DEVICE APP USAGE — how long Life OS itself has been open (Page
+   Visibility API). This cannot see time spent in other apps.
+   ========================================================================= */
+let usageSessionStart = null;
+async function getAppUsageMinutes(dateStr){
+  const logs = await DB.byIndex("appUsageLogs","date",dateStr);
+  return logs.reduce((s,l)=>s+Math.round(l.minutes||0),0);
+}
+async function getAppUsageMinutes7d(){
+  const since = (()=>{ const d=new Date(); d.setDate(d.getDate()-7); return d.toISOString().slice(0,10); })();
+  const all = await DB.getAll("appUsageLogs");
+  return Math.round(all.filter(l=>l.date>=since).reduce((s,l)=>s+(l.minutes||0),0));
+}
+async function flushUsageSession(){
+  if(usageSessionStart==null) return;
+  const minutes = (Date.now()-usageSessionStart)/60000;
+  usageSessionStart = null;
+  if(minutes<0.05) return;
+  const today = todayStr();
+  const existing = (await DB.byIndex("appUsageLogs","date",today))[0];
+  if(existing){ existing.minutes = (existing.minutes||0)+minutes; await DB.put("appUsageLogs", existing); }
+  else { await DB.add("appUsageLogs", {id:uid(), date:today, minutes}); }
+}
+function startUsageTracking(){
+  usageSessionStart = Date.now();
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.hidden) flushUsageSession();
+    else usageSessionStart = Date.now();
+  });
+  window.addEventListener("beforeunload", flushUsageSession);
+  setInterval(flushUsageSession, 5*60000); // periodic save so long sessions aren't lost
+}
+
+/* =========================================================================
    QUICK ADD (FAB)
    ========================================================================= */
 const QUICK_ACTIONS = [
@@ -1657,7 +1901,8 @@ const QUICK_ACTIONS = [
   {em:"📌", l:"Note", mod:"notes"}, {em:"🎒", l:"Inventory item", mod:"inventory"},
   {em:"👤", l:"Contact", mod:"contacts"}, {em:"📄", l:"Document", mod:"document"},
   {em:"✈️", l:"Trip", mod:"trip"}, {em:"😊", l:"Mood", mod:"moods"},
-  {em:"🙏", l:"Gratitude", mod:"gratitude"}, {em:"🏋️", l:"Workout", mod:"workouts"}
+  {em:"🙏", l:"Gratitude", mod:"gratitude"}, {em:"🏋️", l:"Workout", mod:"workouts"},
+  {em:"😴", l:"Sleep", mod:"sleepLogs"}, {em:"🎉", l:"Special date", mod:"importantDates"}
 ];
 function openQuickAdd(){
   openSheet(`
@@ -2221,7 +2466,7 @@ async function checkDueNotifications(){
   const notified = SETTINGS._notifiedToday===today ? (SETTINGS._notifiedIds||[]) : [];
   const newlyNotified = [...notified];
   for(const r of reminders){
-    if(!r.done && r.dueDate===today && !notified.includes("rem-"+r.id)){
+    if(!r.done && reminderOccursOn(r, today) && !notified.includes("rem-"+r.id)){
       fireNotification("Reminder", r.title, "rem-"+r.id); newlyNotified.push("rem-"+r.id);
     }
   }
@@ -2260,7 +2505,7 @@ async function gatherAlerts(){
   ]);
   const out = [];
   tasks.filter(t=>!t.done && t.dueDate && t.dueDate<today).forEach(t=> out.push({icon:"📝", title:t.title, sub:"Overdue • "+fmtDate(t.dueDate)}));
-  reminders.filter(r=>!r.done && r.dueDate===today).forEach(r=> out.push({icon:"⏰", title:r.title, sub:"Today"}));
+  reminders.filter(r=>!r.done && reminderOccursOn(r, today)).forEach(r=> out.push({icon:"⏰", title:r.title, sub:"Today"}));
   subs.filter(s=> s.nextPaymentDate && daysUntil(s.nextPaymentDate)!=null && daysUntil(s.nextPaymentDate)>=0 && daysUntil(s.nextPaymentDate)<=3)
     .forEach(s=> out.push({icon:"💳", title:s.name+" payment", sub: daysUntil(s.nextPaymentDate)===0?"Due today":"Due "+fmtDate(s.nextPaymentDate)}));
   docs.filter(d=> d.expiryDate && daysUntil(d.expiryDate)!=null && daysUntil(d.expiryDate)>=0 && daysUntil(d.expiryDate)<=30)
@@ -2359,6 +2604,8 @@ async function init(){
   renderPinPad();
   renderLockExtras();
   if(SETTINGS.notificationsOn) startNotificationEngine();
+  startUsageTracking();
+  maybeAutoLogLocation();
   setTab("home");
 }
 init();

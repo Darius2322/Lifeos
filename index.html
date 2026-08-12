@@ -218,6 +218,7 @@ nav.tabbar{
   <header class="topbar">
     <h1 id="topbar-title">Life OS</h1>
     <div style="display:flex; gap:4px;">
+      <button class="icon-btn" id="notif-btn" aria-label="Notifications" style="position:relative;">🔔<span id="notif-dot" style="display:none; position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%; background:var(--clay);"></span></button>
       <button class="icon-btn" id="search-btn" aria-label="Search">🔍</button>
       <button class="icon-btn" id="theme-btn" aria-label="Toggle theme">🌙</button>
       <button class="icon-btn" id="lock-btn" aria-label="Lock app">🔒</button>
@@ -276,6 +277,7 @@ nav.tabbar{
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
+const APP_VERSION = "1.2.0";
 const DB_NAME = "lifeos";
 const DB_VERSION = 2;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
@@ -681,13 +683,16 @@ function pushModule(view, module, id){
   document.querySelectorAll(".screen").forEach(s=> s.classList.remove("active"));
   document.getElementById("screen-module").classList.add("active");
   renderModuleScreen();
+  navPush();
 }
-function popModule(){
+function doPopModule(){
   STATE.stack.pop();
   if(STATE.stack.length===0){ setTab(STATE.tab); return; }
+  document.querySelectorAll(".screen").forEach(s=> s.classList.remove("active"));
   document.getElementById("screen-module").classList.add("active");
   renderModuleScreen();
 }
+function popModule(){ appBack(doPopModule); }
 
 function renderTab(tab){
   if(tab==="home") renderHome();
@@ -791,6 +796,13 @@ async function renderHome(){
     <div class="greeting">${greetingWord()}${SETTINGS.name? ", "+esc(SETTINGS.name):""} 👋</div>
     <div class="greeting-date">${new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"})}</div>
 
+    ${updateAvailable? `
+    <div class="card" style="border-color:var(--gold); background:linear-gradient(180deg, rgba(217,169,79,0.14), var(--panel));">
+      <h2><span class="em">⬆️</span>New version available</h2>
+      <p style="font-size:13px; color:var(--fog); margin:0 0 12px;">An updated build of Life OS is ready.</p>
+      <button class="btn sm" id="home-update-btn">Update now</button>
+    </div>` : ""}
+
     <div class="card">
       <div class="ring-wrap">
         ${ringSVG(scores)}
@@ -826,6 +838,9 @@ async function renderHome(){
     const [m,id]=n.dataset.open.split("|"); pushModule("detail", m, id);
   }));
   el2.querySelectorAll("[data-open-new]").forEach(n=> n.addEventListener("click", ()=> pushModule("form", n.dataset.openNew, null)));
+  const homeUpdateBtn = el2.querySelector("#home-update-btn");
+  if(homeUpdateBtn) homeUpdateBtn.addEventListener("click", applyUpdate);
+  updateNotifBadge();
 }
 
 /* =========================================================================
@@ -1074,8 +1089,11 @@ function renderMore(){
       <div class="tile" data-action="backup"><div class="em">💾</div><div class="l">Backup & restore</div><div class="d">Export / import data</div></div>
       <div class="tile" data-action="settings"><div class="em">⚙️</div><div class="l">Settings</div><div class="d">Name, currency, PIN</div></div>
       <div class="tile" data-action="about"><div class="em">ℹ️</div><div class="l">About & roadmap</div></div>
+      <div class="tile" data-action="terms"><div class="em">📃</div><div class="l">Terms & Conditions</div></div>
+      <div class="tile" data-action="privacy"><div class="em">🛡️</div><div class="l">Privacy Policy</div></div>
     </div>
     <p style="font-size:11.5px; color:var(--fog-dim); text-align:center; margin-top:24px;">Everything here lives only on this device.</p>
+    <p style="font-size:11px; color:var(--fog-dim); text-align:center; margin-top:6px;">Built by Darius — <a href="https://dmn-solution.vercel.app" target="_blank" rel="noopener" style="color:var(--fog);">dmn-solution.vercel.app</a></p>
   `;
   el2.querySelectorAll("[data-open]").forEach(n=> n.addEventListener("click", ()=>pushModule("list", n.dataset.open, null)));
   el2.querySelectorAll("[data-custom]").forEach(n=> n.addEventListener("click", ()=>pushModule("list", n.dataset.custom, null)));
@@ -1083,6 +1101,8 @@ function renderMore(){
   el2.querySelector('[data-action="backup"]').addEventListener("click", openBackupSheet);
   el2.querySelector('[data-action="settings"]').addEventListener("click", openSettingsSheet);
   el2.querySelector('[data-action="about"]').addEventListener("click", openAboutSheet);
+  el2.querySelector('[data-action="terms"]').addEventListener("click", openTermsSheet);
+  el2.querySelector('[data-action="privacy"]').addEventListener("click", openPrivacySheet);
   el2.querySelector('[data-review="weekly"]').addEventListener("click", ()=>openReview("weekly"));
   el2.querySelector('[data-review="monthly"]').addEventListener("click", ()=>openReview("monthly"));
 }
@@ -1668,10 +1688,11 @@ function openSearch(){
     <input id="search-input" placeholder="Search tasks, notes, expenses, goals…" autofocus style="margin-bottom:14px;">
     <div id="search-results"></div>
   `;
-  el2.querySelector("[data-back]").addEventListener("click", ()=> setTab(STATE.tab));
+  el2.querySelector("[data-back]").addEventListener("click", ()=> appBack(()=>setTab(STATE.tab)));
   const input = document.getElementById("search-input");
   input.addEventListener("input", ()=> runSearch(input.value));
   input.focus();
+  navPush();
 }
 async function runSearch(q){
   const out = document.getElementById("search-results");
@@ -1959,11 +1980,54 @@ function openAboutSheet(){
     Your Personal Life OS. Fully offline, all data in IndexedDB on this device — no servers, no accounts, no tracking.
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Live now: Dashboard with life-balance ring, Tasks, Reminders, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals, Habits with streaks, Journal, Mood, Gratitude, Reading tracker with streaks, Fitness log, Inventory, Contacts, local Document vault, Travel planner (itinerary + expenses), Places & bucket list, Life timeline, auto-computed Achievements, Weekly & Monthly review, global search, quick add, PIN lock, and full JSON backup/restore.
+    Live now: Dashboard with life-balance ring, Tasks, Reminders, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals, Habits with streaks, Journal, Mood, Gratitude, Reading tracker with streaks, Fitness log, Inventory, Contacts, local Document vault, Travel planner (itinerary + expenses), Places & bucket list, Calendar & special dates, Life timeline, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration, quick add, PIN + biometric lock, and full JSON backup/restore.
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
     Still on the roadmap: Food & Entertainment trackers, a dedicated Learning tracker, richer personal analytics, and a formal Reports screen.
     </p>
+    <div style="border-top:1px solid var(--line); margin-top:16px; padding-top:14px; text-align:center;">
+      <p style="font-size:12px; color:var(--fog-dim); margin:0;">Version ${APP_VERSION}</p>
+      <p style="font-size:12.5px; color:var(--fog); margin:6px 0 0;">Built by Darius — <a href="https://dmn-solution.vercel.app" target="_blank" rel="noopener" style="color:var(--gold); text-decoration:none;">dmn-solution.vercel.app</a></p>
+    </div>
+  `);
+}
+function openTermsSheet(){
+  openSheet(`
+    <div class="sheet-title">Terms & Conditions</div>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    Life OS is provided to you as-is, for personal, non-commercial use in organizing your own tasks, finances, goals, and personal records. There is no warranty, express or implied, that the app will be error-free, uninterrupted, or fit for any particular purpose.
+    </p>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    Because all data is stored only in this browser or app install, you are solely responsible for backing up your data (via the Backup & Restore screen). The developer is not responsible for data loss caused by clearing browser/site data, uninstalling the app, device failure, or browser storage limits.
+    </p>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    Fitness, reading, and journaling features are for personal record-keeping only and do not constitute medical, financial, or legal advice. Consult a qualified professional for decisions in those areas.
+    </p>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    You may not use this app to store or process data belonging to others without their consent, or in any way that violates applicable law. These terms may be updated as the app evolves; continued use after an update constitutes acceptance of the revised terms.
+    </p>
+    <p style="font-size:12px; color:var(--fog-dim); margin-top:14px;">Built by Darius — dmn-solution.vercel.app</p>
+  `);
+}
+function openPrivacySheet(){
+  openSheet(`
+    <div class="sheet-title">Privacy Policy</div>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    Life OS is a local-first, offline application. All the data you enter — tasks, finances, journal entries, documents, contacts, and everything else — is stored only in this device's browser storage (IndexedDB), never transmitted to any server.
+    </p>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    <b style="color:var(--paper);">What we don't do:</b> no account creation, no analytics, no advertising SDKs, no tracking scripts, no third-party data sharing. There is no backend for this app to send your data to — Anthropic/Claude, Vercel, and any hosting provider serving these static files never see your entered data; they only serve the app's code and assets.
+    </p>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    <b style="color:var(--paper);">Device features:</b> if you enable notifications, fingerprint/Face ID unlock, or contact import, those use your browser's built-in APIs (Notifications, WebAuthn, Contact Picker) directly — no data from these passes through any server either. Contact import requires your explicit selection of each contact via your phone's native picker.
+    </p>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    <b style="color:var(--paper);">Backups:</b> when you export a backup, a JSON file is generated on your device and saved wherever you choose (downloads, a cloud drive you control, etc.) — this is entirely under your control and control of the destination's own privacy practices.
+    </p>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    Clearing your browser's site data, or uninstalling the app, permanently deletes this data with no way to recover it unless you've made a backup.
+    </p>
+    <p style="font-size:12px; color:var(--fog-dim); margin-top:14px;">Built by Darius — dmn-solution.vercel.app</p>
   `);
 }
 
@@ -1971,14 +2035,41 @@ function openAboutSheet(){
    SHEET / OVERLAY HELPERS
    ========================================================================= */
 function openSheet(html){
+  const wasOpen = document.getElementById("overlay").classList.contains("open");
   document.getElementById("sheet-content").innerHTML = html;
   document.getElementById("overlay").classList.add("open");
   document.getElementById("sheet").classList.add("open");
+  if(!wasOpen) navPush();
 }
-function closeSheet(){
+function doCloseSheet(){
   document.getElementById("overlay").classList.remove("open");
   document.getElementById("sheet").classList.remove("open");
 }
+function closeSheet(){ appBack(doCloseSheet); }
+
+/* =========================================================================
+   PHONE BACK-BUTTON NAVIGATION — hardware/gesture back moves within the app
+   (closing sheets, stepping back through module screens, exiting search)
+   instead of leaving or closing the app, until there's nothing left to undo.
+   ========================================================================= */
+let appNavDepth = 0;
+function navPush(){
+  appNavDepth++;
+  history.pushState({lifeosNav:appNavDepth}, "", location.href);
+}
+function appBack(fallbackFn){
+  if(appNavDepth>0){ history.back(); }
+  else if(fallbackFn){ fallbackFn(); }
+}
+window.addEventListener("popstate", ()=>{
+  if(appNavDepth>0) appNavDepth--;
+  if(document.getElementById("overlay").classList.contains("open")){ doCloseSheet(); return; }
+  if(document.getElementById("lock-screen").classList.contains("show")){ navPush(); return; }
+  if(STATE.stack.length>0){ doPopModule(); return; }
+  if(document.getElementById("screen-search").classList.contains("active")){ setTab(STATE.tab); return; }
+  // Nothing left to undo inside the app — let the browser/OS handle it
+  // (e.g. exit the app), which is the expected behavior at the root screen.
+});
 
 /* =========================================================================
    PIN LOCK
@@ -2160,31 +2251,80 @@ async function checkDueNotifications(){
 }
 
 /* =========================================================================
-   PWA: install prompt handling + update banner
+   NOTIFICATION CENTER — bell icon in the top bar
+   ========================================================================= */
+async function gatherAlerts(){
+  const today = todayStr();
+  const [tasks, reminders, subs, docs, contacts] = await Promise.all([
+    DB.getAll("tasks"), DB.getAll("reminders"), DB.getAll("subscriptions"), DB.getAll("documents"), DB.getAll("contacts")
+  ]);
+  const out = [];
+  tasks.filter(t=>!t.done && t.dueDate && t.dueDate<today).forEach(t=> out.push({icon:"📝", title:t.title, sub:"Overdue • "+fmtDate(t.dueDate)}));
+  reminders.filter(r=>!r.done && r.dueDate===today).forEach(r=> out.push({icon:"⏰", title:r.title, sub:"Today"}));
+  subs.filter(s=> s.nextPaymentDate && daysUntil(s.nextPaymentDate)!=null && daysUntil(s.nextPaymentDate)>=0 && daysUntil(s.nextPaymentDate)<=3)
+    .forEach(s=> out.push({icon:"💳", title:s.name+" payment", sub: daysUntil(s.nextPaymentDate)===0?"Due today":"Due "+fmtDate(s.nextPaymentDate)}));
+  docs.filter(d=> d.expiryDate && daysUntil(d.expiryDate)!=null && daysUntil(d.expiryDate)>=0 && daysUntil(d.expiryDate)<=30)
+    .forEach(d=> out.push({icon:"📄", title:d.name+" expires soon", sub:fmtDate(d.expiryDate)}));
+  contacts.filter(c=> c.birthday && c.birthday.slice(5)===today.slice(5)).forEach(c=> out.push({icon:"🎂", title:c.name+"'s birthday", sub:"Today"}));
+  contacts.filter(c=> c.nextFollowUp===today).forEach(c=> out.push({icon:"👤", title:"Follow up with "+c.name, sub:"Today"}));
+  return out;
+}
+async function updateNotifBadge(){
+  const alerts = await gatherAlerts();
+  document.getElementById("notif-dot").style.display = alerts.length? "block":"none";
+}
+async function openNotificationsPanel(){
+  const alerts = await gatherAlerts();
+  openSheet(`
+    <div class="sheet-title">Notifications</div>
+    ${!SETTINGS.notificationsOn? `<p style="font-size:12.5px; color:var(--fog); line-height:1.5;">Device sound & vibration are off. <span id="np-enable" style="color:var(--gold); font-weight:600; cursor:pointer;">Turn on</span></p>`:""}
+    <div class="card" style="margin-top:10px;">
+      ${alerts.length? alerts.map(a=>`<div class="row"><div class="row-icon">${a.icon}</div><div class="row-body"><div class="row-title">${esc(a.title)}</div><div class="row-sub">${esc(a.sub)}</div></div></div>`).join("") : `<div class="empty"><span class="em">🔔</span><p>Nothing needs your attention right now.</p></div>`}
+    </div>
+  `);
+  const en = document.getElementById("np-enable");
+  if(en) en.addEventListener("click", async ()=>{ await enableNotifications(); openNotificationsPanel(); });
+}
+document.getElementById("notif-btn").addEventListener("click", openNotificationsPanel);
+
+/* =========================================================================
+   PWA: install prompt handling + update detection (banner + dashboard card)
    ========================================================================= */
 let deferredInstallPrompt = null;
+let updateAvailable = false;
 window.addEventListener("beforeinstallprompt", (e)=>{ e.preventDefault(); deferredInstallPrompt = e; });
 
+function markUpdateAvailable(){
+  updateAvailable = true;
+  document.getElementById("update-banner").classList.add("show");
+  if(STATE.tab==="home" && STATE.stack.length===0) renderHome();
+}
+function applyUpdate(){
+  navigator.serviceWorker.getRegistration().then(reg=>{
+    if(reg && reg.waiting){ reg.waiting.postMessage("SKIP_WAITING"); }
+    setTimeout(()=> location.reload(), 200);
+  });
+}
 if("serviceWorker" in navigator){
   window.addEventListener("load", ()=>{
     navigator.serviceWorker.register("./service-worker.js").then(reg=>{
+      // A worker may already be waiting from a previous visit.
+      if(reg.waiting && navigator.serviceWorker.controller) markUpdateAvailable();
       reg.addEventListener("updatefound", ()=>{
         const nw = reg.installing;
         nw.addEventListener("statechange", ()=>{
-          if(nw.state==="installed" && navigator.serviceWorker.controller){
-            document.getElementById("update-banner").classList.add("show");
-          }
+          if(nw.state==="installed" && navigator.serviceWorker.controller) markUpdateAvailable();
         });
       });
+      // Actively check for updates — installed PWAs don't always trigger the
+      // browser's own periodic check, so we ask on load, on foreground, and hourly.
+      reg.update();
+      setInterval(()=> reg.update(), 60*60*1000);
+      document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) reg.update(); });
     }).catch(()=>{ /* offline-first: app still works fully without SW registration succeeding */ });
   });
 }
-document.getElementById("update-btn").addEventListener("click", ()=>{
-  navigator.serviceWorker.getRegistration().then(reg=>{
-    if(reg && reg.waiting){ reg.waiting.postMessage("SKIP_WAITING"); }
-    location.reload();
-  });
-});
+document.getElementById("update-btn").addEventListener("click", applyUpdate);
 
 /* =========================================================================
    NAV WIRING + INIT

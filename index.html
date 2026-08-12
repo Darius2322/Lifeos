@@ -277,9 +277,9 @@ nav.tabbar{
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const DB_NAME = "lifeos";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
 // travel (trips/itinerary/expenses), places/bucket list, timeline, importantDates.
 // Phase 3 adds: sleep log, on-device app-usage log, location log.
@@ -321,7 +321,8 @@ const STORES = [
   {name:"importantDates", key:"id", indexes:["date"]},
   {name:"sleepLogs", key:"id", indexes:["date"]},
   {name:"appUsageLogs", key:"id", indexes:["date"]},
-  {name:"locationLogs", key:"id", indexes:["date"]}
+  {name:"locationLogs", key:"id", indexes:["date"]},
+  {name:"photos", key:"id", indexes:["date"]}
 ];
 
 const DB = {
@@ -378,6 +379,26 @@ function daysUntil(d){
   if(!d) return null;
   const dt = new Date(d+"T00:00:00"), t = new Date(todayStr()+"T00:00:00");
   return Math.round((dt-t)/86400000);
+}
+// Whole years + months between a past date and today, e.g. {years:24, months:9}.
+function yearsMonthsSince(dateStr){
+  if(!dateStr) return null;
+  const past = new Date(dateStr+"T00:00:00"), now = new Date(todayStr()+"T00:00:00");
+  if(past > now) return null;
+  let years = now.getFullYear()-past.getFullYear();
+  let months = now.getMonth()-past.getMonth();
+  if(now.getDate() < past.getDate()) months--;
+  if(months < 0){ years--; months += 12; }
+  return {years, months};
+}
+function agoText(dateStr){
+  const p = yearsMonthsSince(dateStr);
+  if(!p) return "";
+  if(p.years===0 && p.months===0) return "this month";
+  const parts = [];
+  if(p.years>0) parts.push(p.years+"yr");
+  if(p.months>0) parts.push(p.months+"mo");
+  return parts.join(" ")+" ago";
 }
 function greetingWord(){
   const h = new Date().getHours();
@@ -814,9 +835,9 @@ async function computeLifeScores(){
 async function renderHome(){
   document.getElementById("topbar-title").textContent = "Life OS";
   const el2 = document.getElementById("screen-home");
-  const [tasks, reminders, expenses, goals, habits, subs, journal] = await Promise.all([
+  const [tasks, reminders, expenses, goals, habits, subs, journal, profile] = await Promise.all([
     DB.getAll("tasks"), DB.getAll("reminders"), DB.getAll("expenses"), DB.getAll("personalGoals"),
-    DB.getAll("habits"), DB.getAll("subscriptions"), DB.getAll("journal")
+    DB.getAll("habits"), DB.getAll("subscriptions"), DB.getAll("journal"), DB.get("profile","main")
   ]);
   const today = todayStr();
   const todaysTasks = tasks.filter(t=>!t.done && (t.dueDate===today || !t.dueDate));
@@ -830,9 +851,23 @@ async function renderHome(){
   const wroteToday = journal.some(j=>j.date===today);
   const scores = await computeLifeScores();
 
+  const aboutLines = [];
+  if(profile){
+    const age = yearsMonthsSince(profile.birthday);
+    if(age) aboutLines.push(`Today you are ${age.years}yr${age.months?" "+age.months+"mo":""}`);
+    if(profile.primaryFinishDate) aboutLines.push(`Finished primary school ${agoText(profile.primaryFinishDate)}`);
+    if(profile.highSchoolFinishDate) aboutLines.push(`Finished high school ${agoText(profile.highSchoolFinishDate)}`);
+    if(profile.collegeFinishDate) aboutLines.push(`Finished college ${agoText(profile.collegeFinishDate)}`);
+  }
+
   el2.innerHTML = `
     <div class="greeting">${greetingWord()}${SETTINGS.name? ", "+esc(SETTINGS.name):""} 👋</div>
     <div class="greeting-date">${new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"})}</div>
+
+    ${aboutLines.length? `
+    <div class="card" data-open-custom="__profile__">
+      ${aboutLines.map((l,i)=>`<p style="margin:${i===0?'0':'6px'} 0 0; font-size:13.5px; color:${i===0?'var(--paper)':'var(--fog)'}; font-weight:${i===0?'600':'400'};">${esc(l)}</p>`).join("")}
+    </div>` : ""}
 
     ${updateAvailable? `
     <div class="card" style="border-color:var(--gold); background:linear-gradient(180deg, rgba(217,169,79,0.14), var(--panel));">
@@ -876,6 +911,7 @@ async function renderHome(){
     const [m,id]=n.dataset.open.split("|"); pushModule("detail", m, id);
   }));
   el2.querySelectorAll("[data-open-new]").forEach(n=> n.addEventListener("click", ()=> pushModule("form", n.dataset.openNew, null)));
+  el2.querySelectorAll("[data-open-custom]").forEach(n=> n.addEventListener("click", ()=> pushModule("list", n.dataset.openCustom, null)));
   const homeUpdateBtn = el2.querySelector("#home-update-btn");
   if(homeUpdateBtn) homeUpdateBtn.addEventListener("click", applyUpdate);
   updateNotifBadge();
@@ -1100,6 +1136,7 @@ function renderMore(){
       <div class="tile" data-custom="__profile__"><div class="em">🧑</div><div class="l">Profile</div><div class="d">Birthday, education, hobbies, fears</div></div>
       <div class="tile" data-open="sleepLogs"><div class="em">😴</div><div class="l">Sleep</div></div>
       <div class="tile" data-custom="__locations__"><div class="em">📍</div><div class="l">Location log</div></div>
+      <div class="tile" data-custom="__photos__"><div class="em">🖼️</div><div class="l">Photos</div></div>
     </div>
     <div class="section-label">Track</div>
     <div class="tile-grid">
@@ -1160,7 +1197,8 @@ const CUSTOM_SCREENS = {
   "__achievements__": {label:"Achievements", render:renderAchievementsScreen},
   "__calendar__": {label:"Calendar", render:renderCalendarScreen},
   "__profile__": {label:"About Me", render:renderProfileScreen},
-  "__locations__": {label:"Location log", render:renderLocationsScreen}
+  "__locations__": {label:"Location log", render:renderLocationsScreen},
+  "__photos__": {label:"Photos", render:renderPhotosScreen}
 };
 async function renderModuleScreen(){
   const top = STATE.stack[STATE.stack.length-1];
@@ -1615,8 +1653,8 @@ async function renderCalendarScreen(el2){
       <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px;">${cells}</div>
     </div>
     <button class="btn" id="cal-add">+ Add special date</button>
-    <div class="section-label">Upcoming special dates</div>
-    <div class="card" id="cal-upcoming"></div>
+    <div class="section-label">All activities in ${monthLabel}</div>
+    <div class="card" id="cal-all"></div>
   `;
   el2.querySelector("[data-back]").addEventListener("click", popModule);
   el2.querySelector("#cal-prev").addEventListener("click", ()=>{ calCursor.setMonth(calCursor.getMonth()-1); renderCalendarScreen(el2); });
@@ -1624,12 +1662,19 @@ async function renderCalendarScreen(el2){
   el2.querySelector("#cal-add").addEventListener("click", ()=> openImportantDateForm(null, todayStr(), el2));
   el2.querySelectorAll("[data-day]").forEach(n=> n.addEventListener("click", ()=> openDayDetail(n.dataset.day, itemsOnDay(n.dataset.day), el2)));
 
-  const upcoming = dates.filter(d=>d.date>=todayStr() || d.recurring==="Yes").sort((a,b)=>(a.date||"")<(b.date||"")?-1:1).slice(0,6);
-  document.getElementById("cal-upcoming").innerHTML = upcoming.length? upcoming.map(d=>`
-    <div class="row" data-edit="${d.id}"><div class="row-icon">🎉</div><div class="row-body"><div class="row-title">${esc(d.title)}</div><div class="row-sub">${fmtDate(d.date)}${d.recurring==='Yes'?' • yearly':''}</div></div></div>
-  `).join("") : `<div class="empty"><p>No special dates yet.</p></div>`;
-  document.getElementById("cal-upcoming").querySelectorAll("[data-edit]").forEach(n=> n.addEventListener("click", async ()=>{
-    const rec = await DB.get("importantDates", n.dataset.edit); openImportantDateForm(rec, rec.date, el2);
+  // Every activity across the currently displayed month, chronological.
+  const allItems = [];
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    itemsOnDay(dateStr).forEach(it=> allItems.push({...it, date:dateStr}));
+  }
+  document.getElementById("cal-all").innerHTML = allItems.length? allItems.map(it=>`
+    <div class="row" data-item="${it.type}|${it.id}"><div class="row-icon">${it.icon}</div><div class="row-body"><div class="row-title">${esc(it.label)}</div><div class="row-sub">${fmtDate(it.date)}</div></div></div>
+  `).join("") : `<div class="empty"><span class="em">🗓️</span><p>Nothing on the calendar this month.</p></div>`;
+  document.getElementById("cal-all").querySelectorAll("[data-item]").forEach(n=> n.addEventListener("click", async ()=>{
+    const [type, id] = n.dataset.item.split("|");
+    if(type==="importantDates"){ const rec = await DB.get("importantDates", id); openImportantDateForm(rec, rec.date, el2); }
+    else pushModule("form", type, id);
   }));
 }
 function openDayDetail(dateStr, items, el2){
@@ -1728,10 +1773,14 @@ async function renderProfileScreen(el2){
       <h2><span class="em">🧑</span>About Me</h2>
       <label>Birthday</label><input id="pf-birthday" type="date" value="${p.birthday||''}">
       <label>Primary school</label><input id="pf-primary" value="${esc(p.primarySchool||'')}">
+      <label>Primary school finish date</label><input id="pf-primary-date" type="date" value="${p.primaryFinishDate||''}">
       <label>High school</label><input id="pf-highschool" value="${esc(p.highSchool||'')}">
+      <label>High school finish date</label><input id="pf-highschool-date" type="date" value="${p.highSchoolFinishDate||''}">
       <label>College / university</label><input id="pf-college" value="${esc(p.college||'')}">
+      <label>College finish date</label><input id="pf-college-date" type="date" value="${p.collegeFinishDate||''}">
       <label>Hobbies</label><textarea id="pf-hobbies" placeholder="One per line, or comma-separated">${esc(p.hobbies||'')}</textarea>
       <label>Fears</label><textarea id="pf-fears">${esc(p.fears||'')}</textarea>
+      <p class="field-hint">Finish dates power the "you are..." and "...years ago" lines on your Home dashboard. Leave any blank to skip that line.</p>
     </div>
 
     <div class="section-label">More about me</div>
@@ -1769,8 +1818,11 @@ async function renderProfileScreen(el2){
   el2.querySelector("#pf-save").addEventListener("click", async ()=>{
     p.birthday = document.getElementById("pf-birthday").value;
     p.primarySchool = document.getElementById("pf-primary").value;
+    p.primaryFinishDate = document.getElementById("pf-primary-date").value;
     p.highSchool = document.getElementById("pf-highschool").value;
+    p.highSchoolFinishDate = document.getElementById("pf-highschool-date").value;
     p.college = document.getElementById("pf-college").value;
+    p.collegeFinishDate = document.getElementById("pf-college-date").value;
     p.hobbies = document.getElementById("pf-hobbies").value;
     p.fears = document.getElementById("pf-fears").value;
     p.customFacts = p.customFacts.filter(f=>f.label.trim()||f.value.trim());
@@ -1887,6 +1939,63 @@ function startUsageTracking(){
   });
   window.addEventListener("beforeunload", flushUsageSession);
   setInterval(flushUsageSession, 5*60000); // periodic save so long sessions aren't lost
+}
+
+/* =========================================================================
+   PHOTOS — a private local gallery. Images are stored as Blobs in
+   IndexedDB, same as document files, and included in JSON backups.
+   ========================================================================= */
+async function renderPhotosScreen(el2){
+  const photos = (await DB.getAll("photos")).sort((a,b)=>(b.date||"")<(a.date||"")?-1:1);
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <div class="btn-row"><button class="btn" id="ph-add">📷 Add pictures</button></div>
+    <input type="file" id="ph-file" accept="image/*" multiple style="display:none;">
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;" id="ph-grid"></div>
+    ${!photos.length? `<div class="empty"><span class="em">🖼️</span><p>No pictures yet.</p></div>`:""}
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  const fileInput = el2.querySelector("#ph-file");
+  el2.querySelector("#ph-add").addEventListener("click", ()=> fileInput.click());
+  fileInput.addEventListener("change", async ()=>{
+    const files = Array.from(fileInput.files||[]);
+    for(const f of files){
+      await DB.add("photos", {id:uid(), date:todayStr(), fileName:f.name, fileType:f.type, blob:f, caption:""});
+    }
+    if(files.length) toast(`Added ${files.length} picture${files.length===1?'':'s'}`);
+    fileInput.value = "";
+    renderPhotosScreen(el2);
+  });
+  const grid = el2.querySelector("#ph-grid");
+  photos.forEach(p=>{
+    const url = URL.createObjectURL(p.blob);
+    const cell = document.createElement("div");
+    cell.style.cssText = "aspect-ratio:1; border-radius:10px; overflow:hidden; cursor:pointer; background:var(--panel-2);";
+    cell.innerHTML = `<img src="${url}" style="width:100%; height:100%; object-fit:cover; display:block;">`;
+    cell.addEventListener("click", ()=> openPhotoViewer(p, url, el2));
+    grid.appendChild(cell);
+  });
+}
+function openPhotoViewer(p, url, el2){
+  openSheet(`
+    <div class="sheet-title">${esc(p.caption||fmtDate(p.date))}</div>
+    <img src="${url}" style="width:100%; border-radius:12px; margin:10px 0;">
+    <label>Caption</label><input id="ph-caption" value="${esc(p.caption||'')}">
+    <div class="btn-row">
+      <button class="btn" id="ph-save-caption">Save caption</button>
+      <button class="btn danger" id="ph-delete">Delete</button>
+    </div>
+  `);
+  document.getElementById("ph-save-caption").onclick = async ()=>{
+    p.caption = document.getElementById("ph-caption").value;
+    await DB.put("photos", p);
+    closeSheet(); toast("Saved"); renderPhotosScreen(el2);
+  };
+  document.getElementById("ph-delete").onclick = async ()=>{
+    if(!confirm("Delete this picture?")) return;
+    await DB.delete("photos", p.id);
+    closeSheet(); toast("Deleted"); renderPhotosScreen(el2);
+  };
 }
 
 /* =========================================================================
@@ -2142,6 +2251,16 @@ function openBackupSheet(){
   openSheet(`
     <div class="sheet-title">Backup & restore</div>
     <p style="font-size:13px; color:var(--fog); line-height:1.5;">Your data lives only in this browser/app install. Back it up regularly — clearing site data or reinstalling can erase it.</p>
+
+    <div class="card" style="background:var(--panel-2); margin:14px 0;">
+      <h2 style="font-size:14px;"><span class="em">📲</span>Moving to a new phone</h2>
+      <p style="font-size:12.5px; color:var(--fog); line-height:1.6; margin:0;">
+      1. Tap <b style="color:var(--paper);">Export full backup</b> below — this saves one .json file with everything: tasks, money, journal, photos, documents, all of it.<br>
+      2. Get that file onto the new phone — email it to yourself, save it to a cloud drive you use, or connect via USB and copy it over.<br>
+      3. Install Life OS on the new phone, open More → Backup & restore, and use <b style="color:var(--paper);">Restore from file</b> below with mode set to Replace.
+      </p>
+    </div>
+
     <button class="btn" id="bk-export">Export full backup (.json)</button>
     <label>Restore from file</label>
     <input type="file" id="bk-import" accept="application/json">
@@ -2149,7 +2268,7 @@ function openBackupSheet(){
       <span class="chip active" data-mode="merge" id="mode-merge">Merge</span>
       <span class="chip" data-mode="replace" id="mode-replace">Replace all</span>
     </div>
-    <p class="field-hint">Merge keeps existing records and adds/updates from the file. Replace clears each store first.</p>
+    <p class="field-hint">Merge keeps existing records and adds/updates from the file — use this when combining data. Replace clears each store first — use this when seeding a fresh install on a new phone.</p>
   `);
   let mode = "merge";
   document.getElementById("mode-merge").onclick = ()=>{ mode="merge"; document.getElementById("mode-merge").classList.add("active"); document.getElementById("mode-replace").classList.remove("active"); };
@@ -2174,13 +2293,14 @@ function blobToDataURL(blob){
 async function dataURLToBlob(dataUrl){
   const res = await fetch(dataUrl); return await res.blob();
 }
+const BLOB_STORES = ["documents","photos"]; // stores whose records may hold a Blob under `.blob`
 async function exportBackup(){
   const data = {app:"lifeos", version:1, exportDate:nowISO(), stores:{}};
   let recordCount = 0;
   for(const s of STORES){
     let all = await DB.getAll(s.name);
-    // Document blobs can't survive JSON.stringify — inline them as data URLs.
-    if(s.name==="documents"){
+    // Blobs can't survive JSON.stringify — inline them as data URLs.
+    if(BLOB_STORES.includes(s.name)){
       all = await Promise.all(all.map(async r=>{
         if(r.blob instanceof Blob){ const dataUrl = await blobToDataURL(r.blob); return {...r, blob:undefined, blobDataUrl:dataUrl}; }
         return r;
@@ -2203,7 +2323,7 @@ async function importBackup(data, mode){
   for(const s of STORES){
     let records = data.stores[s.name];
     if(!records) continue;
-    if(s.name==="documents"){
+    if(BLOB_STORES.includes(s.name)){
       records = await Promise.all(records.map(async r=>{
         if(r.blobDataUrl){ const blob = await dataURLToBlob(r.blobDataUrl); return {...r, blob, blobDataUrl:undefined}; }
         return r;
@@ -2225,7 +2345,7 @@ function openAboutSheet(){
     Your Personal Life OS. Fully offline, all data in IndexedDB on this device — no servers, no accounts, no tracking.
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Live now: Dashboard with life-balance ring, Tasks, Reminders, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals, Habits with streaks, Journal, Mood, Gratitude, Reading tracker with streaks, Fitness log, Inventory, Contacts, local Document vault, Travel planner (itinerary + expenses), Places & bucket list, Calendar & special dates, Life timeline, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration, quick add, PIN + biometric lock, and full JSON backup/restore.
+    Live now: Dashboard with life-balance ring, About Me (birthday, education timeline, hobbies, fears), Tasks, Reminders with repeat, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals, Habits with streaks, Journal, Mood, Gratitude, Sleep log, Reading tracker with streaks, Fitness log, Inventory, Contacts, local Document vault, Photos, Travel planner (itinerary + expenses), Places & bucket list, Calendar with full activity list, Life timeline, Location log, on-device app usage, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration, quick add, PIN + biometric lock, and full JSON backup/restore (built for moving to a new phone).
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
     Still on the roadmap: Food & Entertainment trackers, a dedicated Learning tracker, richer personal analytics, and a formal Reports screen.

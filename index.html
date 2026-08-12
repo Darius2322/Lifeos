@@ -22,6 +22,13 @@
   --font-mono: "SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
   color-scheme: dark;
 }
+body.theme-light{
+  --ink:#F5F2EA; --panel:#FFFFFF; --panel-2:#EFEAE0; --line:#E1DACB;
+  --paper:#221F17; --fog:#6B6455; --fog-dim:#9A9384;
+  color-scheme: light;
+}
+body.theme-light .fab, body.theme-light .btn:not(.ghost):not(.danger){ color:#1A1406; }
+body.theme-light #update-banner button{ color:var(--gold); }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
 body{
@@ -212,6 +219,7 @@ nav.tabbar{
     <h1 id="topbar-title">Life OS</h1>
     <div style="display:flex; gap:4px;">
       <button class="icon-btn" id="search-btn" aria-label="Search">🔍</button>
+      <button class="icon-btn" id="theme-btn" aria-label="Toggle theme">🌙</button>
       <button class="icon-btn" id="lock-btn" aria-label="Lock app">🔒</button>
     </div>
   </header>
@@ -255,7 +263,8 @@ nav.tabbar{
     <div style="font-family:var(--font-display); font-size:18px; margin-top:10px;" id="lock-title">Enter PIN</div>
     <div class="pin-dots" id="pin-dots"></div>
     <div class="pin-pad" id="pin-pad"></div>
-    <button class="btn ghost sm" id="lock-forgot" style="margin-top:18px; width:auto;">Forgot PIN? Reset app lock</button>
+    <button class="btn ghost sm" id="lock-fingerprint" style="margin-top:16px; width:auto; display:none;">🫆 Use fingerprint / Face ID</button>
+    <button class="btn ghost sm" id="lock-forgot" style="margin-top:14px; width:auto;">Forgot PIN? Reset app lock</button>
   </div>
 
 </div>
@@ -268,10 +277,11 @@ nav.tabbar{
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
 const DB_NAME = "lifeos";
-const DB_VERSION = 1;
-// Stores implemented in this phase. Additional modules (inventory, documents,
-// contacts, travel, reading, workouts, timeline, achievements...) are planned
-// for a later DB_VERSION bump — see README notes at bottom of file.
+const DB_VERSION = 2;
+// Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
+// travel (trips/itinerary/expenses), places/bucket list, timeline, importantDates.
+// Bumping DB_VERSION triggers onupgradeneeded below, which only *adds* missing
+// stores — existing Phase 1 data is untouched.
 const STORES = [
   {name:"profile", key:"id"},
   {name:"settings", key:"id"},
@@ -285,6 +295,7 @@ const STORES = [
   {name:"debtPayments", key:"id", indexes:["debtId"]},
   {name:"subscriptions", key:"id", indexes:["nextPaymentDate"]},
   {name:"personalGoals", key:"id", indexes:["status"]},
+  {name:"goalMilestones", key:"id", indexes:["goalId"]},
   {name:"habits", key:"id"},
   {name:"habitCompletions", key:"id", indexes:["habitId","date"]},
   {name:"journal", key:"id", indexes:["date"]},
@@ -292,7 +303,19 @@ const STORES = [
   {name:"moods", key:"id", indexes:["date"]},
   {name:"reviews", key:"id", indexes:["type","date"]},
   {name:"tags", key:"id"},
-  {name:"appData", key:"id"}
+  {name:"appData", key:"id"},
+  {name:"inventory", key:"id", indexes:["category"]},
+  {name:"documents", key:"id", indexes:["category","expiryDate"]},
+  {name:"contacts", key:"id", indexes:["category"]},
+  {name:"books", key:"id", indexes:["status"]},
+  {name:"readingSessions", key:"id", indexes:["bookId","date"]},
+  {name:"workouts", key:"id", indexes:["date","category"]},
+  {name:"trips", key:"id"},
+  {name:"tripItems", key:"id", indexes:["tripId","date"]},
+  {name:"tripExpenses", key:"id", indexes:["tripId"]},
+  {name:"places", key:"id", indexes:["status"]},
+  {name:"timeline", key:"id", indexes:["date","category"]},
+  {name:"importantDates", key:"id", indexes:["date"]}
 ];
 
 const DB = {
@@ -332,7 +355,7 @@ const DB = {
 const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const todayStr = ()=> new Date().toISOString().slice(0,10);
 const nowISO = ()=> new Date().toISOString();
-let SETTINGS = {id:"main", name:"", currency:"KSh", theme:"dark", pinHash:null, lockTimeoutMin:2, weekStart:1};
+let SETTINGS = {id:"main", name:"Darius", currency:"KSh", theme:"dark", pinHash:null, lockTimeoutMin:2, weekStart:1, notificationsOn:false, webauthnId:null};
 
 function fmtMoney(n){
   const v = Number(n||0);
@@ -492,6 +515,98 @@ const MODULES = {
       {key:"note", label:"Note", type:"textarea"}
     ],
     title:r=> "😊".repeat(0)+ "Mood "+r.value+"/5", sub:r=>fmtDate(r.date)+(r.note? " • "+r.note.slice(0,40):"")
+  },
+  inventory: {
+    label:"Inventory", icon:"🎒", color:"var(--blue)", store:"inventory",
+    fields:[
+      {key:"name", label:"Item name", type:"text", required:true},
+      {key:"category", label:"Category", type:"select", options:["Electronics","Clothing","Furniture","Tools","Documents","Vehicles","Appliances","Books","Other"]},
+      {key:"quantity", label:"Quantity", type:"number"},
+      {key:"purchaseDate", label:"Purchase date", type:"date"},
+      {key:"purchasePrice", label:"Purchase price", type:"number"},
+      {key:"currentValue", label:"Current estimated value", type:"number"},
+      {key:"location", label:"Location", type:"text"},
+      {key:"condition", label:"Condition", type:"select", options:["New","Excellent","Good","Fair","Needs repair"]},
+      {key:"serialNumber", label:"Serial number", type:"text"},
+      {key:"warrantyExpiry", label:"Warranty expiry", type:"date"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.name, sub:r=> (r.category||"Item")+(r.condition?" • "+r.condition:""), amount:r=>r.currentValue!=null?r.currentValue:r.purchasePrice
+  },
+  contacts: {
+    label:"Contacts", icon:"👤", color:"var(--violet)", store:"contacts",
+    fields:[
+      {key:"name", label:"Name", type:"text", required:true},
+      {key:"category", label:"Relationship", type:"select", options:["Family","Friends","Work","School","Professional","Other"]},
+      {key:"phone", label:"Phone", type:"text"},
+      {key:"email", label:"Email", type:"text"},
+      {key:"birthday", label:"Birthday", type:"date"},
+      {key:"nextFollowUp", label:"Next follow-up", type:"date"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.name, sub:r=> (r.category||"Contact")+(r.phone?" • "+r.phone:"")
+  },
+  books: {
+    label:"Reading", icon:"📕", color:"var(--gold)", store:"books",
+    fields:[
+      {key:"title", label:"Title", type:"text", required:true},
+      {key:"author", label:"Author", type:"text"},
+      {key:"genre", label:"Genre", type:"text"},
+      {key:"status", label:"Status", type:"select", options:["Want to read","Reading","Completed","Paused","Abandoned"]},
+      {key:"rating", label:"Rating (1-5)", type:"select", options:["","1","2","3","4","5"]},
+      {key:"startDate", label:"Start date", type:"date"},
+      {key:"finishDate", label:"Finish date", type:"date"},
+      {key:"notes", label:"Favorite quotes / notes", type:"textarea"}
+    ],
+    title:r=>r.title, sub:r=> (r.author?r.author+" • ":"")+(r.status||"Want to read")
+  },
+  workouts: {
+    label:"Fitness", icon:"🏋️", color:"var(--clay)", store:"workouts",
+    fields:[
+      {key:"category", label:"Type", type:"select", options:["Strength","Cardio","Running","Walking","Cycling","Sports","Home workout","Other"], required:true},
+      {key:"date", label:"Date", type:"date", required:true},
+      {key:"duration", label:"Duration (minutes)", type:"number"},
+      {key:"sets", label:"Sets", type:"number"},
+      {key:"reps", label:"Reps", type:"number"},
+      {key:"weight", label:"Weight (kg)", type:"number"},
+      {key:"distance", label:"Distance (km)", type:"number"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.category, sub:r=> fmtDate(r.date)+(r.duration?" • "+r.duration+" min":"")
+  },
+  places: {
+    label:"Places", icon:"📍", color:"var(--sage)", store:"places",
+    fields:[
+      {key:"name", label:"Name", type:"text", required:true},
+      {key:"category", label:"Category", type:"select", options:["Places to visit","Restaurants","Cities","Countries","Attractions","Events"]},
+      {key:"status", label:"Status", type:"select", options:["Want to visit","Planned","Visited"]},
+      {key:"rating", label:"Rating (1-5)", type:"select", options:["","1","2","3","4","5"]},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.name, sub:r=> (r.category||"Place")+" • "+(r.status||"Want to visit")
+  },
+  trips: {
+    label:"Travel", icon:"✈️", color:"var(--blue)", store:"trips",
+    fields:[
+      {key:"name", label:"Trip name", type:"text", required:true},
+      {key:"destination", label:"Destination", type:"text"},
+      {key:"startDate", label:"Start date", type:"date"},
+      {key:"endDate", label:"End date", type:"date"},
+      {key:"budget", label:"Budget", type:"number"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.name, sub:r=> (r.destination?r.destination+" • ":"")+(r.startDate?fmtDate(r.startDate):""), amount:r=>r.budget
+  },
+  importantDates: {
+    label:"Special dates", icon:"🎉", color:"var(--violet)", store:"importantDates",
+    fields:[
+      {key:"title", label:"Title", type:"text", required:true},
+      {key:"date", label:"Date", type:"date", required:true},
+      {key:"category", label:"Type", type:"select", options:["Birthday","Anniversary","Holiday","Appointment","Other"]},
+      {key:"recurring", label:"Repeats every year", type:"select", options:["No","Yes"]},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.title, sub:r=> fmtDate(r.date)+(r.recurring==="Yes"?" • yearly":"")
   }
 };
 
@@ -515,6 +630,38 @@ async function toggleHabitToday(habitId){
   const today = all.find(c=>c.date===todayStr());
   if(today){ await DB.delete("habitCompletions", today.id); }
   else { await DB.add("habitCompletions", {id:uid(), habitId, date:todayStr()}); }
+}
+
+/* =========================================================================
+   READING — sessions log against a book; reuses the same streak shape as habits
+   ========================================================================= */
+async function streakFromDates(dates){
+  const set = new Set(dates);
+  let streak = 0, d = new Date(todayStr()+"T00:00:00");
+  if(!set.has(todayStr())) d.setDate(d.getDate()-1);
+  while(set.has(d.toISOString().slice(0,10))){ streak++; d.setDate(d.getDate()-1); }
+  return streak;
+}
+async function readingStreak(){
+  const sessions = await DB.getAll("readingSessions");
+  return streakFromDates(sessions.map(s=>s.date));
+}
+function openReadingSessionForm(bookId){
+  openSheet(`
+    <div class="sheet-title">Log reading session</div>
+    <label>Date</label><input id="rs-date" type="date" value="${todayStr()}">
+    <label>Minutes read</label><input id="rs-duration" type="number">
+    <label>Pages read</label><input id="rs-pages" type="number">
+    <button class="btn" id="rs-save" style="margin-top:14px;">Save session</button>
+  `);
+  document.getElementById("rs-save").onclick = async ()=>{
+    await DB.add("readingSessions", {
+      id:uid(), bookId, date:document.getElementById("rs-date").value||todayStr(),
+      duration:Number(document.getElementById("rs-duration").value)||0,
+      pages:Number(document.getElementById("rs-pages").value)||0
+    });
+    closeSheet(); toast("Reading session logged");
+  };
 }
 
 /* =========================================================================
@@ -711,6 +858,7 @@ async function renderPlan(){
   }
 
   el2.innerHTML = `
+    <div style="margin-bottom:14px;"><button class="btn ghost" id="plan-cal-btn">🗓️ Open calendar</button></div>
     <div class="section-label">Reminders</div>
     <div class="card">
       ${reminders.filter(r=>!r.done).length? reminders.filter(r=>!r.done).sort((a,b)=>(a.dueDate||"")<(b.dueDate||"")?-1:1).map(remRow).join("") : `<div class="empty"><span class="em">⏰</span><p>No reminders yet.</p></div>`}
@@ -750,6 +898,7 @@ async function renderPlan(){
   el2.querySelectorAll("[data-open-rem]").forEach(n=> n.addEventListener("click", ()=> pushModule("form","reminders",n.dataset.openRem)));
   el2.querySelectorAll("[data-new]").forEach(n=> n.addEventListener("click", ()=> pushModule("form", n.dataset.new, null)));
   el2.querySelectorAll("[data-openmod]").forEach(n=> n.addEventListener("click", ()=> pushModule("list", n.dataset.openmod, null)));
+  el2.querySelector("#plan-cal-btn").addEventListener("click", ()=> pushModule("list", "__calendar__", null));
 }
 
 /* =========================================================================
@@ -893,12 +1042,31 @@ function renderMore(){
   document.getElementById("topbar-title").textContent = "More";
   const el2 = document.getElementById("screen-more");
   el2.innerHTML = `
+    <div class="section-label">Track</div>
+    <div class="tile-grid">
+      <div class="tile" data-open="books"><div class="em">📕</div><div class="l">Reading</div></div>
+      <div class="tile" data-open="workouts"><div class="em">🏋️</div><div class="l">Fitness</div></div>
+      <div class="tile" data-open="inventory"><div class="em">🎒</div><div class="l">Inventory</div></div>
+      <div class="tile" data-open="places"><div class="em">📍</div><div class="l">Places & bucket list</div></div>
+    </div>
+    <div class="section-label">Records</div>
+    <div class="tile-grid">
+      <div class="tile" data-open="contacts"><div class="em">👤</div><div class="l">Contacts</div></div>
+      <div class="tile" data-custom="__documents__"><div class="em">📄</div><div class="l">Documents</div></div>
+      <div class="tile" data-open="trips"><div class="em">✈️</div><div class="l">Travel</div></div>
+      <div class="tile" data-custom="__timeline__"><div class="em">🕰️</div><div class="l">Life timeline</div></div>
+    </div>
     <div class="section-label">Reflect</div>
     <div class="tile-grid">
       <div class="tile" data-open="journal"><div class="em">📖</div><div class="l">Journal</div></div>
       <div class="tile" data-open="moods"><div class="em">😊</div><div class="l">Mood</div></div>
       <div class="tile" data-open="gratitude"><div class="em">🙏</div><div class="l">Gratitude</div></div>
+      <div class="tile" data-custom="__achievements__"><div class="em">🏆</div><div class="l">Achievements</div></div>
+    </div>
+    <div class="section-label">Reviews</div>
+    <div class="tile-grid">
       <div class="tile" data-review="weekly"><div class="em">🗂️</div><div class="l">Weekly review</div></div>
+      <div class="tile" data-review="monthly"><div class="em">📆</div><div class="l">Monthly review</div></div>
     </div>
     <div class="section-label">System</div>
     <div class="tile-grid">
@@ -910,26 +1078,43 @@ function renderMore(){
     <p style="font-size:11.5px; color:var(--fog-dim); text-align:center; margin-top:24px;">Everything here lives only on this device.</p>
   `;
   el2.querySelectorAll("[data-open]").forEach(n=> n.addEventListener("click", ()=>pushModule("list", n.dataset.open, null)));
+  el2.querySelectorAll("[data-custom]").forEach(n=> n.addEventListener("click", ()=>pushModule("list", n.dataset.custom, null)));
   el2.querySelector('[data-action="search"]').addEventListener("click", openSearch);
   el2.querySelector('[data-action="backup"]').addEventListener("click", openBackupSheet);
   el2.querySelector('[data-action="settings"]').addEventListener("click", openSettingsSheet);
   el2.querySelector('[data-action="about"]').addEventListener("click", openAboutSheet);
-  el2.querySelector('[data-review="weekly"]').addEventListener("click", openWeeklyReview);
+  el2.querySelector('[data-review="weekly"]').addEventListener("click", ()=>openReview("weekly"));
+  el2.querySelector('[data-review="monthly"]').addEventListener("click", ()=>openReview("monthly"));
 }
 
 /* =========================================================================
    GENERIC MODULE SCREEN — list / form / detail, driven by MODULES config
    ========================================================================= */
+const CUSTOM_SCREENS = {
+  "__documents__": {label:"Documents", render:renderDocumentsScreen},
+  "__timeline__": {label:"Timeline", render:renderTimelineScreen},
+  "__achievements__": {label:"Achievements", render:renderAchievementsScreen},
+  "__calendar__": {label:"Calendar", render:renderCalendarScreen}
+};
 async function renderModuleScreen(){
   const top = STATE.stack[STATE.stack.length-1];
   if(!top) return;
-  const cfg = MODULES[top.module];
   const el2 = document.getElementById("screen-module");
+
+  if(CUSTOM_SCREENS[top.module]){
+    document.getElementById("topbar-title").textContent = CUSTOM_SCREENS[top.module].label;
+    return CUSTOM_SCREENS[top.module].render(el2);
+  }
+
+  const cfg = MODULES[top.module];
   document.getElementById("topbar-title").textContent = cfg.label;
 
   if(top.view==="list") return renderModuleList(el2, top.module, cfg);
   if(top.view==="form") return renderModuleForm(el2, top.module, cfg, top.id);
-  if(top.view==="detail") return renderModuleDetail(el2, top.module, cfg, top.id);
+  if(top.view==="detail"){
+    if(top.module==="trips") return renderTripDetail(el2, top.id);
+    return renderModuleDetail(el2, top.module, cfg, top.id);
+  }
 }
 
 async function renderModuleList(el2, modKey, cfg){
@@ -945,11 +1130,37 @@ async function renderModuleList(el2, modKey, cfg){
           ${cfg.amount? `<div class="row-amt" style="color:${cfg.amount(r)<0?'var(--clay)':'var(--sage)'}">${fmtMoney(cfg.amount(r))}</div>`:""}
         </div>`).join("") : `<div class="empty"><span class="em">${cfg.icon}</span><p>No ${cfg.label.toLowerCase()} yet.</p></div>`}
     </div>
-    <button class="btn">+ Add ${cfg.label.toLowerCase().replace(/s$/,'')}</button>
+    <div class="btn-row">
+      <button class="btn" id="ml-add">+ Add ${cfg.label.toLowerCase().replace(/s$/,'')}</button>
+      ${modKey==='contacts'? `<button class="btn ghost" id="ml-import">📱 Import from phone</button>`:""}
+    </div>
   `;
   el2.querySelector("[data-back]").addEventListener("click", popModule);
-  el2.querySelector(".btn").addEventListener("click", ()=> pushModule("form", modKey, null));
+  el2.querySelector("#ml-add").addEventListener("click", ()=> pushModule("form", modKey, null));
   el2.querySelectorAll(".row").forEach(r=> r.addEventListener("click", ()=> pushModule("detail", modKey, r.dataset.id)));
+  const imp = el2.querySelector("#ml-import");
+  if(imp) imp.addEventListener("click", ()=> importContactsFromPhone(el2, modKey, cfg));
+}
+async function importContactsFromPhone(el2, modKey, cfg){
+  if(!("contacts" in navigator && "ContactsManager" in window)){
+    toast("Contact import needs Chrome on Android — not supported on this browser/device");
+    return;
+  }
+  try{
+    const picked = await navigator.contacts.select(["name","tel","email"], {multiple:true});
+    if(!picked.length) return;
+    for(const c of picked){
+      await DB.add("contacts", {
+        id:uid(), createdAt:nowISO(),
+        name:(c.name&&c.name[0])||"Unnamed",
+        phone:(c.tel&&c.tel[0])||"",
+        email:(c.email&&c.email[0])||"",
+        category:"Other"
+      });
+    }
+    toast(`Imported ${picked.length} contact${picked.length===1?'':'s'}`);
+    renderModuleList(el2, modKey, cfg);
+  }catch(e){ toast("Import cancelled"); }
 }
 
 async function renderModuleForm(el2, modKey, cfg, id){
@@ -1014,6 +1225,7 @@ async function renderModuleDetail(el2, modKey, cfg, id){
       <button class="btn danger" id="d-del">Delete</button>
     </div>
     ${modKey==='debts' ? `<button class="btn" id="d-pay" style="margin-top:10px;">Log payment</button>` : ""}
+    ${modKey==='books' ? `<button class="btn" id="d-read" style="margin-top:10px;">Log reading session</button>` : ""}
   `;
   el2.querySelector("[data-back]").addEventListener("click", popModule);
   el2.querySelector("#d-edit").addEventListener("click", ()=>{ STATE.stack[STATE.stack.length-1].view="form"; renderModuleScreen(); });
@@ -1021,6 +1233,8 @@ async function renderModuleDetail(el2, modKey, cfg, id){
     if(!confirm("Delete this record? This can't be undone.")) return;
     await DB.delete(cfg.store, id); toast("Deleted"); popModule();
   });
+  const readBtn = el2.querySelector("#d-read");
+  if(readBtn) readBtn.addEventListener("click", ()=> openReadingSessionForm(id));
   const payBtn = el2.querySelector("#d-pay");
   if(payBtn) payBtn.addEventListener("click", ()=>{
     const amt = prompt("Payment amount:");
@@ -1037,15 +1251,393 @@ async function renderModuleDetail(el2, modKey, cfg, id){
 }
 
 /* =========================================================================
+   TRAVEL PLANNER — trip detail with nested itinerary + expenses
+   ========================================================================= */
+async function renderTripDetail(el2, tripId){
+  const trip = await DB.get("trips", tripId);
+  if(!trip){ popModule(); return; }
+  const [items, exps] = await Promise.all([DB.byIndex("tripItems","tripId",tripId), DB.byIndex("tripExpenses","tripId",tripId)]);
+  items.sort((a,b)=> (a.date||"")<(b.date||"")?-1:1);
+  const spent = exps.reduce((s,e)=>s+Number(e.amount||0),0);
+  const budget = Number(trip.budget||0);
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <div class="card">
+      <h2>✈️ ${esc(trip.name)}</h2>
+      <div class="kv"><span class="k">Destination</span><span class="v">${esc(trip.destination||"—")}</span></div>
+      <div class="kv"><span class="k">Dates</span><span class="v">${trip.startDate?fmtDate(trip.startDate):"—"} → ${trip.endDate?fmtDate(trip.endDate):"—"}</span></div>
+      ${budget? `<div class="kv"><span class="k">Budget</span><span class="v">${fmtMoney(budget)}</span></div>
+      <div class="kv"><span class="k">Spent</span><span class="v" style="color:${spent>budget?'var(--clay)':'var(--sage)'}">${fmtMoney(spent)}</span></div>
+      <div class="kv"><span class="k">Remaining</span><span class="v">${fmtMoney(budget-spent)}</span></div>
+      <div class="pbar"><div style="width:${Math.min(100,budget?spent/budget*100:0)}%; background:${spent>budget?'var(--clay)':'var(--sage)'};"></div></div>` : ""}
+      ${trip.notes? `<p style="font-size:13px; color:var(--fog); margin-top:12px;">${esc(trip.notes)}</p>`:""}
+    </div>
+    <div class="btn-row"><button class="btn ghost" id="t-edit">Edit trip</button><button class="btn danger" id="t-del">Delete trip</button></div>
+
+    <div class="section-label">Itinerary</div>
+    <div class="card">
+      ${items.length? items.map(it=>`
+        <div class="row" data-item="${it.id}"><div class="row-icon">${{Activity:"🎡",Transport:"🚗",Accommodation:"🏨",Meal:"🍽️",Event:"🎫",Place:"📍",Appointment:"📅"}[it.type]||"📍"}</div>
+        <div class="row-body"><div class="row-title">${esc(it.description)}</div><div class="row-sub">${it.date?fmtDate(it.date):""}${it.time?" • "+it.time:""}${it.location?" • "+esc(it.location):""}</div></div>
+        ${it.cost? `<div class="row-amt">${fmtMoney(it.cost)}</div>`:""}</div>
+      `).join("") : `<div class="empty"><p>No itinerary items yet.</p></div>`}
+    </div>
+    <button class="btn ghost" id="t-add-item">+ Add itinerary item</button>
+
+    <div class="section-label" style="margin-top:20px;">Trip expenses</div>
+    <div class="card">
+      ${exps.length? exps.map(e=>`<div class="row"><div class="row-icon">💸</div><div class="row-body"><div class="row-title">${esc(e.category)}</div><div class="row-sub">${esc(e.notes||"")}</div></div><div class="row-amt" style="color:var(--clay)">${fmtMoney(e.amount)}</div></div>`).join("") : `<div class="empty"><p>No expenses logged.</p></div>`}
+    </div>
+    <button class="btn ghost" id="t-add-exp">+ Add trip expense</button>
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  el2.querySelector("#t-edit").addEventListener("click", ()=> pushModule("form","trips",tripId));
+  el2.querySelector("#t-del").addEventListener("click", async ()=>{
+    if(!confirm("Delete this trip and all its itinerary/expenses?")) return;
+    await DB.delete("trips", tripId);
+    for(const it of items) await DB.delete("tripItems", it.id);
+    for(const e of exps) await DB.delete("tripExpenses", e.id);
+    toast("Trip deleted"); popModule();
+  });
+  el2.querySelector("#t-add-item").addEventListener("click", ()=> openTripItemForm(tripId, el2));
+  el2.querySelector("#t-add-exp").addEventListener("click", ()=> openTripExpenseForm(tripId, el2));
+}
+function openTripItemForm(tripId, el2){
+  openSheet(`
+    <div class="sheet-title">Add itinerary item</div>
+    <label>Type</label>
+    <select id="ti-type">${["Activity","Transport","Accommodation","Meal","Event","Place","Appointment"].map(t=>`<option>${t}</option>`).join("")}</select>
+    <label>Description</label><input id="ti-desc" placeholder="e.g. Check in at hotel">
+    <label>Date</label><input id="ti-date" type="date" value="${todayStr()}">
+    <label>Time</label><input id="ti-time" type="time">
+    <label>Location</label><input id="ti-loc">
+    <label>Cost</label><input id="ti-cost" type="number">
+    <label>Notes</label><textarea id="ti-notes"></textarea>
+    <button class="btn" id="ti-save" style="margin-top:14px;">Add to itinerary</button>
+  `);
+  document.getElementById("ti-save").onclick = async ()=>{
+    const description = document.getElementById("ti-desc").value.trim();
+    if(!description){ toast("Enter a description"); return; }
+    await DB.add("tripItems", {
+      id:uid(), tripId, type:document.getElementById("ti-type").value, description,
+      date:document.getElementById("ti-date").value, time:document.getElementById("ti-time").value,
+      location:document.getElementById("ti-loc").value, cost:Number(document.getElementById("ti-cost").value)||0,
+      notes:document.getElementById("ti-notes").value
+    });
+    closeSheet(); toast("Added"); renderTripDetail(el2, tripId);
+  };
+}
+function openTripExpenseForm(tripId, el2){
+  openSheet(`
+    <div class="sheet-title">Add trip expense</div>
+    <label>Category</label>
+    <select id="te-cat">${["Transport","Accommodation","Food","Activities","Shopping","Other"].map(t=>`<option>${t}</option>`).join("")}</select>
+    <label>Amount</label><input id="te-amount" type="number">
+    <label>Notes</label><textarea id="te-notes"></textarea>
+    <button class="btn" id="te-save" style="margin-top:14px;">Add expense</button>
+  `);
+  document.getElementById("te-save").onclick = async ()=>{
+    const amount = Number(document.getElementById("te-amount").value);
+    if(!amount){ toast("Enter an amount"); return; }
+    await DB.add("tripExpenses", {id:uid(), tripId, category:document.getElementById("te-cat").value, amount, notes:document.getElementById("te-notes").value, date:todayStr()});
+    closeSheet(); toast("Expense added"); renderTripDetail(el2, tripId);
+  };
+}
+
+/* =========================================================================
+   DOCUMENT VAULT — files stored as Blobs directly in IndexedDB, local only
+   ========================================================================= */
+async function renderDocumentsScreen(el2){
+  const docs = (await DB.getAll("documents")).sort((a,b)=>(b.date||"")<(a.date||"")?-1:1);
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.5; margin-top:0;">Files are stored only in this browser/app install. Back up regularly from More → Backup — clearing site data can erase them.</p>
+    <div class="card">
+      ${docs.length? docs.map(d=>{
+        const days = d.expiryDate? daysUntil(d.expiryDate) : null;
+        const warn = days!=null && days<=60;
+        return `<div class="row" data-id="${d.id}"><div class="row-icon">📄</div><div class="row-body"><div class="row-title">${esc(d.name)}</div>
+        <div class="row-sub" style="${warn?'color:var(--clay);':''}">${d.category||"Document"}${d.expiryDate? " • Expires "+fmtDate(d.expiryDate)+(days!=null?" ("+days+"d)":""):""}</div></div></div>`;
+      }).join("") : `<div class="empty"><span class="em">📄</span><p>No documents yet.</p></div>`}
+    </div>
+    <button class="btn" id="doc-add">+ Add document</button>
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  el2.querySelector("#doc-add").addEventListener("click", openDocumentForm);
+  el2.querySelectorAll("[data-id]").forEach(n=> n.addEventListener("click", ()=> openDocumentDetail(n.dataset.id, el2)));
+}
+function openDocumentForm(){
+  openSheet(`
+    <div class="sheet-title">Add document</div>
+    <label>Name</label><input id="doc-name" placeholder="e.g. Passport">
+    <label>Category</label>
+    <select id="doc-cat">${["Identification","Education","Employment","Finance","Insurance","Certificates","Receipts","Personal","Other"].map(c=>`<option>${c}</option>`).join("")}</select>
+    <label>Date</label><input id="doc-date" type="date" value="${todayStr()}">
+    <label>Expiry date (optional)</label><input id="doc-expiry" type="date">
+    <label>File</label><input id="doc-file" type="file">
+    <label>Notes</label><textarea id="doc-notes"></textarea>
+    <button class="btn" id="doc-save" style="margin-top:14px;">Save document</button>
+  `);
+  document.getElementById("doc-save").onclick = async ()=>{
+    const name = document.getElementById("doc-name").value.trim();
+    if(!name){ toast("Enter a name"); return; }
+    const fileInput = document.getElementById("doc-file");
+    const file = fileInput.files[0];
+    const rec = {
+      id:uid(), name, category:document.getElementById("doc-cat").value,
+      date:document.getElementById("doc-date").value, expiryDate:document.getElementById("doc-expiry").value,
+      notes:document.getElementById("doc-notes").value, fileName: file? file.name:null,
+      fileType: file? file.type:null, blob: file? file : null
+    };
+    await DB.put("documents", rec);
+    closeSheet(); toast("Document saved");
+    if(STATE.stack.length && STATE.stack[STATE.stack.length-1].module==="__documents__") renderDocumentsScreen(document.getElementById("screen-module"));
+  };
+}
+async function openDocumentDetail(id, listEl){
+  const d = await DB.get("documents", id);
+  const days = d.expiryDate? daysUntil(d.expiryDate) : null;
+  openSheet(`
+    <div class="sheet-title">${esc(d.name)}</div>
+    <div class="kv"><span class="k">Category</span><span class="v">${esc(d.category||"—")}</span></div>
+    <div class="kv"><span class="k">Date</span><span class="v">${d.date?fmtDate(d.date):"—"}</span></div>
+    ${d.expiryDate? `<div class="kv"><span class="k">Expires</span><span class="v" style="${days<=60?'color:var(--clay)':''}">${fmtDate(d.expiryDate)}${days!=null?" ("+days+"d)":""}</span></div>`:""}
+    ${d.notes? `<div class="kv"><span class="k">Notes</span><span class="v">${esc(d.notes)}</span></div>`:""}
+    <div class="btn-row">
+      ${d.blob? `<button class="btn ghost" id="doc-view">View / download file</button>`:""}
+      <button class="btn danger" id="doc-del">Delete</button>
+    </div>
+  `);
+  const viewBtn = document.getElementById("doc-view");
+  if(viewBtn) viewBtn.onclick = ()=>{
+    const url = URL.createObjectURL(d.blob);
+    const a = document.createElement("a"); a.href = url; a.download = d.fileName||d.name; a.target="_blank";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+  };
+  document.getElementById("doc-del").onclick = async ()=>{
+    if(!confirm("Delete this document?")) return;
+    await DB.delete("documents", id); closeSheet(); toast("Deleted"); renderDocumentsScreen(listEl);
+  };
+}
+
+/* =========================================================================
+   LIFE TIMELINE — chronological visual history
+   ========================================================================= */
+const TIMELINE_ICONS = {"Graduation":"🎓","New job":"💼","Achievement":"🏆","Trip":"✈️","Birthday":"🎂","Relationship":"❤️","New home":"🏠","Education":"📚","Realization":"💡","Other":"⭐"};
+async function renderTimelineScreen(el2){
+  const events = (await DB.getAll("timeline")).sort((a,b)=> (b.date||"")<(a.date||"")?-1:1);
+  const byYear = {};
+  events.forEach(e=>{ const y = (e.date||"").slice(0,4)||"Undated"; (byYear[y]=byYear[y]||[]).push(e); });
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    ${events.length? Object.keys(byYear).sort().reverse().map(y=>`
+      <div class="section-label">${y}</div>
+      <div class="card">
+        ${byYear[y].map(e=>`<div class="row" data-id="${e.id}"><div class="row-icon">${TIMELINE_ICONS[e.category]||"⭐"}</div>
+        <div class="row-body"><div class="row-title">${esc(e.title)}</div><div class="row-sub">${e.date?fmtDate(e.date):""}${e.description?" • "+esc(e.description.slice(0,40)):""}</div></div></div>`).join("")}
+      </div>
+    `).join("") : `<div class="empty" style="margin-top:20px;"><span class="em">🕰️</span><p>No life events yet. Add graduations, jobs, trips, milestones — anything worth remembering.</p></div>`}
+    <button class="btn" id="tl-add">+ Add life event</button>
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  el2.querySelector("#tl-add").addEventListener("click", ()=> openTimelineForm(null, el2));
+  el2.querySelectorAll("[data-id]").forEach(n=> n.addEventListener("click", async ()=>{
+    const e = await DB.get("timeline", n.dataset.id); openTimelineForm(e, el2);
+  }));
+}
+function openTimelineForm(existing, el2){
+  openSheet(`
+    <div class="sheet-title">${existing?"Edit":"Add"} life event</div>
+    <label>Title</label><input id="tl-title" value="${existing?esc(existing.title):''}">
+    <label>Category</label>
+    <select id="tl-cat">${Object.keys(TIMELINE_ICONS).map(c=>`<option ${existing&&existing.category===c?'selected':''}>${c}</option>`).join("")}</select>
+    <label>Date</label><input id="tl-date" type="date" value="${existing?existing.date||'':todayStr()}">
+    <label>Description</label><textarea id="tl-desc">${existing?esc(existing.description||''):''}</textarea>
+    <div class="btn-row">
+      <button class="btn" id="tl-save">Save</button>
+      ${existing?`<button class="btn danger" id="tl-del">Delete</button>`:""}
+    </div>
+  `);
+  document.getElementById("tl-save").onclick = async ()=>{
+    const title = document.getElementById("tl-title").value.trim();
+    if(!title){ toast("Enter a title"); return; }
+    const rec = existing || {id:uid()};
+    rec.title=title; rec.category=document.getElementById("tl-cat").value;
+    rec.date=document.getElementById("tl-date").value; rec.description=document.getElementById("tl-desc").value;
+    await DB.put("timeline", rec); closeSheet(); toast("Saved"); renderTimelineScreen(el2);
+  };
+  if(existing) document.getElementById("tl-del").onclick = async ()=>{
+    await DB.delete("timeline", existing.id); closeSheet(); toast("Deleted"); renderTimelineScreen(el2);
+  };
+}
+
+/* =========================================================================
+   ACHIEVEMENTS — computed automatically from real activity, not a manual list
+   ========================================================================= */
+async function computeAchievements(){
+  const [tasks, goals, books, savingsBudgets, journal, habits, workouts, income, expenses] = await Promise.all([
+    DB.getAll("tasks"), DB.getAll("personalGoals"), DB.getAll("books"), DB.getAll("budgets"),
+    DB.getAll("journal"), DB.getAll("habits"), DB.getAll("workouts"), DB.getAll("income"), DB.getAll("expenses")
+  ]);
+  const doneTasks = tasks.filter(t=>t.done).length;
+  const completedGoals = goals.filter(g=>g.status==="Completed").length;
+  const completedBooks = books.filter(b=>b.status==="Completed").length;
+  let bestHabitStreak = 0;
+  for(const h of habits){ const s = await habitStreak(h.id); if(s>bestHabitStreak) bestHabitStreak=s; }
+  const journalMonths = new Set(journal.map(j=>(j.date||"").slice(0,7))).size;
+  const workoutStreak = await streakFromDates(workouts.map(w=>w.date));
+  const netSaved = income.reduce((s,i)=>s+Number(i.amount||0),0) - expenses.reduce((s,e)=>s+Number(e.amount||0),0);
+
+  return [
+    {label:"First goal completed", icon:"🎯", unlocked: completedGoals>=1, progress: Math.min(1,completedGoals/1)},
+    {label:"7-day habit streak", icon:"🔥", unlocked: bestHabitStreak>=7, progress: Math.min(1,bestHabitStreak/7)},
+    {label:"30-day habit streak", icon:"🔥", unlocked: bestHabitStreak>=30, progress: Math.min(1,bestHabitStreak/30)},
+    {label:"First book completed", icon:"📕", unlocked: completedBooks>=1, progress: Math.min(1,completedBooks/1)},
+    {label:"First savings goal", icon:"💰", unlocked: netSaved>0, progress: netSaved>0?1:0},
+    {label:"100 tasks completed", icon:"✅", unlocked: doneTasks>=100, progress: Math.min(1,doneTasks/100)},
+    {label:"First journal month", icon:"📖", unlocked: journalMonths>=1, progress: Math.min(1,journalMonths/1)},
+    {label:"First workout streak", icon:"🏋️", unlocked: workoutStreak>=3, progress: Math.min(1,workoutStreak/3)}
+  ];
+}
+
+/* =========================================================================
+   CALENDAR — month grid; write special dates and mark events on any day
+   ========================================================================= */
+let calCursor = new Date(todayStr()+"T00:00:00"); calCursor.setDate(1);
+async function renderCalendarScreen(el2){
+  const [tasks, reminders, dates] = await Promise.all([DB.getAll("tasks"), DB.getAll("reminders"), DB.getAll("importantDates")]);
+  const y = calCursor.getFullYear(), m = calCursor.getMonth();
+  const firstDow = new Date(y,m,1).getDay(); // 0=Sun
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const monthLabel = calCursor.toLocaleDateString(undefined,{month:"long", year:"numeric"});
+
+  function itemsOnDay(dateStr){
+    const md = dateStr.slice(5);
+    const out = [];
+    tasks.forEach(t=> t.dueDate===dateStr && out.push({icon:"📝", label:t.title}));
+    reminders.forEach(r=> r.dueDate===dateStr && out.push({icon:"⏰", label:r.title}));
+    dates.forEach(d=>{
+      if(d.date===dateStr || (d.recurring==="Yes" && d.date && d.date.slice(5)===md)) out.push({icon:"🎉", label:d.title});
+    });
+    return out;
+  }
+
+  let cells = "";
+  for(let i=0;i<firstDow;i++) cells += `<div></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const items = itemsOnDay(dateStr);
+    const isToday = dateStr===todayStr();
+    cells += `<div data-day="${dateStr}" style="aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:10px; cursor:pointer; ${isToday?'background:var(--gold); color:#1A1406; font-weight:700;':'background:var(--panel-2);'}">
+      <div style="font-size:13px;">${d}</div>
+      ${items.length? `<div style="display:flex; gap:2px; margin-top:2px;">${items.slice(0,3).map(()=>`<span style="width:4px;height:4px;border-radius:50%;background:${isToday?'#1A1406':'var(--gold)'};"></span>`).join("")}</div>`:""}
+    </div>`;
+  }
+
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <button class="icon-btn" id="cal-prev">‹</button>
+        <h2 style="margin:0;">${monthLabel}</h2>
+        <button class="icon-btn" id="cal-next">›</button>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; text-align:center; font-size:10.5px; color:var(--fog);">
+        ${["S","M","T","W","T","F","S"].map(d=>`<div>${d}</div>`).join("")}
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px;">${cells}</div>
+    </div>
+    <button class="btn" id="cal-add">+ Add special date</button>
+    <div class="section-label">Upcoming special dates</div>
+    <div class="card" id="cal-upcoming"></div>
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  el2.querySelector("#cal-prev").addEventListener("click", ()=>{ calCursor.setMonth(calCursor.getMonth()-1); renderCalendarScreen(el2); });
+  el2.querySelector("#cal-next").addEventListener("click", ()=>{ calCursor.setMonth(calCursor.getMonth()+1); renderCalendarScreen(el2); });
+  el2.querySelector("#cal-add").addEventListener("click", ()=> openImportantDateForm(null, todayStr(), el2));
+  el2.querySelectorAll("[data-day]").forEach(n=> n.addEventListener("click", ()=> openDayDetail(n.dataset.day, itemsOnDay(n.dataset.day), el2)));
+
+  const upcoming = dates.filter(d=>d.date>=todayStr() || d.recurring==="Yes").sort((a,b)=>(a.date||"")<(b.date||"")?-1:1).slice(0,6);
+  document.getElementById("cal-upcoming").innerHTML = upcoming.length? upcoming.map(d=>`
+    <div class="row" data-edit="${d.id}"><div class="row-icon">🎉</div><div class="row-body"><div class="row-title">${esc(d.title)}</div><div class="row-sub">${fmtDate(d.date)}${d.recurring==='Yes'?' • yearly':''}</div></div></div>
+  `).join("") : `<div class="empty"><p>No special dates yet.</p></div>`;
+  document.getElementById("cal-upcoming").querySelectorAll("[data-edit]").forEach(n=> n.addEventListener("click", async ()=>{
+    const rec = await DB.get("importantDates", n.dataset.edit); openImportantDateForm(rec, rec.date, el2);
+  }));
+}
+function openDayDetail(dateStr, items, el2){
+  openSheet(`
+    <div class="sheet-title">${fmtDate(dateStr)}</div>
+    ${items.length? `<div class="card" style="margin-top:12px;">${items.map(i=>`<div class="row"><div class="row-icon">${i.icon}</div><div class="row-body"><div class="row-title">${esc(i.label)}</div></div></div>`).join("")}</div>`:`<p style="font-size:13px; color:var(--fog);">Nothing on this day yet.</p>`}
+    <button class="btn" id="dd-add" style="margin-top:14px;">+ Add special date</button>
+  `);
+  document.getElementById("dd-add").addEventListener("click", ()=>{ closeSheet(); openImportantDateForm(null, dateStr, el2); });
+}
+function openImportantDateForm(existing, defaultDate, el2){
+  openSheet(`
+    <div class="sheet-title">${existing?"Edit":"Add"} special date</div>
+    <label>Title</label><input id="id-title" value="${existing?esc(existing.title):''}" placeholder="e.g. Mom's birthday">
+    <label>Date</label><input id="id-date" type="date" value="${existing?existing.date:defaultDate}">
+    <label>Type</label>
+    <select id="id-cat">${["Birthday","Anniversary","Holiday","Appointment","Other"].map(c=>`<option ${existing&&existing.category===c?'selected':''}>${c}</option>`).join("")}</select>
+    <label>Repeats every year</label>
+    <select id="id-rec"><option ${!existing||existing.recurring!=='Yes'?'selected':''}>No</option><option ${existing&&existing.recurring==='Yes'?'selected':''}>Yes</option></select>
+    <label>Notes</label><textarea id="id-notes">${existing?esc(existing.notes||''):''}</textarea>
+    <div class="btn-row">
+      <button class="btn" id="id-save">Save</button>
+      ${existing?`<button class="btn danger" id="id-del">Delete</button>`:""}
+    </div>
+  `);
+  document.getElementById("id-save").onclick = async ()=>{
+    const title = document.getElementById("id-title").value.trim();
+    if(!title){ toast("Enter a title"); return; }
+    const rec = existing || {id:uid(), createdAt:nowISO()};
+    rec.title=title; rec.date=document.getElementById("id-date").value;
+    rec.category=document.getElementById("id-cat").value; rec.recurring=document.getElementById("id-rec").value;
+    rec.notes=document.getElementById("id-notes").value;
+    await DB.put("importantDates", rec); closeSheet(); toast("Saved"); renderCalendarScreen(el2);
+  };
+  if(existing) document.getElementById("id-del").onclick = async ()=>{
+    await DB.delete("importantDates", existing.id); closeSheet(); toast("Deleted"); renderCalendarScreen(el2);
+  };
+}
+
+async function renderAchievementsScreen(el2){
+  const ach = await computeAchievements();
+  const unlockedCount = ach.filter(a=>a.unlocked).length;
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <div class="card" style="text-align:center;">
+      <div style="font-family:var(--font-mono); font-size:26px; color:var(--gold); font-weight:700;">${unlockedCount}/${ach.length}</div>
+      <div style="font-size:12px; color:var(--fog); margin-top:2px;">achievements unlocked</div>
+    </div>
+    <div class="tile-grid">
+      ${ach.map(a=>`
+        <div class="tile" style="${a.unlocked?'':'opacity:0.45;'}">
+          <div class="em">${a.icon}</div>
+          <div class="l">${a.label}</div>
+          <div class="pbar"><div style="width:${Math.round(a.progress*100)}%; background:${a.unlocked?'var(--sage)':'var(--fog-dim)'};"></div></div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+}
+
+/* =========================================================================
    QUICK ADD (FAB)
    ========================================================================= */
 const QUICK_ACTIONS = [
   {em:"📝", l:"Task", mod:"tasks"}, {em:"⏰", l:"Reminder", mod:"reminders"},
   {em:"💸", l:"Expense", mod:"expenses"}, {em:"💵", l:"Income", mod:"income"},
-  {em:"🤝", l:"Debt", mod:"debts"}, {em:"🎯", l:"Goal", mod:"personalGoals"},
-  {em:"🔥", l:"Habit", mod:"habit"}, {em:"📖", l:"Journal", mod:"journal"},
-  {em:"📌", l:"Note", mod:"notes"}, {em:"🔄", l:"Subscription", mod:"subscriptions"},
-  {em:"🙏", l:"Gratitude", mod:"gratitude"}, {em:"😊", l:"Mood", mod:"moods"}
+  {em:"🤝", l:"Debt", mod:"debts"}, {em:"💳", l:"Subscription", mod:"subscriptions"},
+  {em:"🎯", l:"Goal", mod:"personalGoals"}, {em:"🔥", l:"Habit", mod:"habit"},
+  {em:"📖", l:"Journal", mod:"journal"}, {em:"📕", l:"Book", mod:"books"},
+  {em:"📌", l:"Note", mod:"notes"}, {em:"🎒", l:"Inventory item", mod:"inventory"},
+  {em:"👤", l:"Contact", mod:"contacts"}, {em:"📄", l:"Document", mod:"document"},
+  {em:"✈️", l:"Trip", mod:"trip"}, {em:"😊", l:"Mood", mod:"moods"},
+  {em:"🙏", l:"Gratitude", mod:"gratitude"}, {em:"🏋️", l:"Workout", mod:"workouts"}
 ];
 function openQuickAdd(){
   openSheet(`
@@ -1057,6 +1649,8 @@ function openQuickAdd(){
   document.querySelectorAll(".qa-item").forEach(n=> n.addEventListener("click", ()=>{
     closeSheet();
     if(n.dataset.mod==="habit"){ openHabitForm(); return; }
+    if(n.dataset.mod==="document"){ openDocumentForm(); return; }
+    if(n.dataset.mod==="trip"){ pushModule("form","trips",null); return; }
     pushModule("form", n.dataset.mod, null);
   }));
 }
@@ -1086,54 +1680,77 @@ async function runSearch(q){
   let html = "";
   for(const [key, cfg] of Object.entries(MODULES)){
     const all = await DB.getAll(cfg.store);
-    const hits = all.filter(r=> JSON.stringify(r).toLowerCase().includes(needle));
+    const hits = all.filter(r=> JSON.stringify(r,(k,v)=> k==='blob'?undefined:v).toLowerCase().includes(needle));
     if(hits.length){
       html += `<div class="section-label">${cfg.label} — ${hits.length}</div><div class="card">`;
       html += hits.slice(0,10).map(r=>`<div class="row" data-open="${key}|${r.id}"><div class="row-icon">${cfg.icon}</div><div class="row-body"><div class="row-title">${esc(cfg.title(r))}</div><div class="row-sub">${esc(cfg.sub?cfg.sub(r):"")}</div></div></div>`).join("");
       html += `</div>`;
     }
   }
+  // Custom (non-generic) stores: documents and timeline
+  const docs = (await DB.getAll("documents")).filter(d=> JSON.stringify(d,(k,v)=>k==='blob'?undefined:v).toLowerCase().includes(needle));
+  if(docs.length){
+    html += `<div class="section-label">Documents — ${docs.length}</div><div class="card">`;
+    html += docs.slice(0,10).map(d=>`<div class="row" data-custom-open="__documents__|${d.id}"><div class="row-icon">📄</div><div class="row-body"><div class="row-title">${esc(d.name)}</div><div class="row-sub">${esc(d.category||"")}</div></div></div>`).join("");
+    html += `</div>`;
+  }
+  const tl = (await DB.getAll("timeline")).filter(t=> JSON.stringify(t).toLowerCase().includes(needle));
+  if(tl.length){
+    html += `<div class="section-label">Timeline — ${tl.length}</div><div class="card">`;
+    html += tl.slice(0,10).map(t=>`<div class="row" data-custom-open="__timeline__|${t.id}"><div class="row-icon">${TIMELINE_ICONS[t.category]||"⭐"}</div><div class="row-body"><div class="row-title">${esc(t.title)}</div><div class="row-sub">${t.date?fmtDate(t.date):""}</div></div></div>`).join("");
+    html += `</div>`;
+  }
   out.innerHTML = html || `<div class="empty"><span class="em">🔍</span><p>No matches for "${esc(q)}"</p></div>`;
   out.querySelectorAll("[data-open]").forEach(n=>{ const [m,id]=n.dataset.open.split("|"); n.addEventListener("click", ()=>pushModule("detail", m, id)); });
+  out.querySelectorAll("[data-custom-open]").forEach(n=>{ const [m]=n.dataset.customOpen.split("|"); n.addEventListener("click", ()=>pushModule("list", m, null)); });
 }
 
 /* =========================================================================
    WEEKLY REVIEW
    ========================================================================= */
-async function openWeeklyReview(){
-  const since = (n)=>{ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
-  const start = since(7);
-  const [tasks, expenses, income, habits, journal] = await Promise.all([
-    DB.getAll("tasks"), DB.getAll("expenses"), DB.getAll("income"), DB.getAll("habits"), DB.getAll("journal")
+async function openReview(type){
+  const days = type==="monthly" ? 30 : 7;
+  const start = (()=>{ const d=new Date(); d.setDate(d.getDate()-days); return d.toISOString().slice(0,10); })();
+  const [tasks, expenses, income, habits, journal, goals, books, workouts, debts] = await Promise.all([
+    DB.getAll("tasks"), DB.getAll("expenses"), DB.getAll("income"), DB.getAll("habits"), DB.getAll("journal"),
+    DB.getAll("personalGoals"), DB.getAll("books"), DB.getAll("workouts"), DB.getAll("debts")
   ]);
   const doneTasks = tasks.filter(t=>t.done && (t.completedAt||"").slice(0,10)>=start).length;
   const spent = expenses.filter(e=>e.date>=start).reduce((s,e)=>s+Number(e.amount||0),0);
   const earned = income.filter(i=>i.date>=start).reduce((s,i)=>s+Number(i.amount||0),0);
   const journalCount = journal.filter(j=>j.date>=start).length;
+  const extraStats = type==="monthly" ? `
+      <div class="stat"><div class="n">${goals.filter(g=>g.status==="Completed" && (g.updatedAt||"").slice(0,10)>=start).length}</div><div class="l">goals completed</div></div>
+      <div class="stat"><div class="n">${books.filter(b=>b.status==="Completed" && (b.finishDate||"")>=start).length}</div><div class="l">books finished</div></div>
+      <div class="stat"><div class="n">${workouts.filter(w=>w.date>=start).length}</div><div class="l">workouts</div></div>
+      <div class="stat"><div class="n">${debts.filter(d=>d.direction==="I owe them").reduce((s,d)=>s+Number(d.remaining!=null?d.remaining:d.amount||0),0)>0?"In progress":"Clear"}</div><div class="l">debt status</div></div>
+  ` : `
+      <div class="stat"><div class="n">${habits.length}</div><div class="l">habits tracked</div></div>
+      <div class="stat"><div class="n">${fmtMoney(earned-spent)}</div><div class="l">net saved</div></div>
+  `;
   openSheet(`
-    <div class="sheet-title">Weekly review</div>
+    <div class="sheet-title">${type==="monthly"?"Monthly":"Weekly"} review</div>
     <div class="stat-grid" style="margin:14px 0;">
       <div class="stat"><div class="n">${doneTasks}</div><div class="l">tasks done</div></div>
       <div class="stat"><div class="n">${fmtMoney(earned)}</div><div class="l">earned</div></div>
       <div class="stat"><div class="n">${fmtMoney(spent)}</div><div class="l">spent</div></div>
-      <div class="stat"><div class="n">${habits.length}</div><div class="l">habits tracked</div></div>
       <div class="stat"><div class="n">${journalCount}</div><div class="l">journal entries</div></div>
-      <div class="stat"><div class="n">${fmtMoney(earned-spent)}</div><div class="l">net saved</div></div>
+      ${extraStats}
     </div>
-    <label>Wins this week</label><textarea id="wr-wins"></textarea>
+    <label>Wins this ${type==="monthly"?"month":"week"}</label><textarea id="wr-wins"></textarea>
     <label>Challenges</label><textarea id="wr-challenges"></textarea>
     <label>What I learned</label><textarea id="wr-learned"></textarea>
-    <label>What I'll improve next week</label><textarea id="wr-improve"></textarea>
+    <label>What I'll improve next ${type==="monthly"?"month":"week"}</label><textarea id="wr-improve"></textarea>
     <button class="btn" id="wr-save" style="margin-top:14px;">Save review</button>
   `);
   document.getElementById("wr-save").onclick = async ()=>{
     await DB.add("reviews", {
-      id:uid(), type:"weekly", date:todayStr(),
+      id:uid(), type, date:todayStr(),
       stats:{doneTasks, spent, earned, journalCount},
       wins:document.getElementById("wr-wins").value, challenges:document.getElementById("wr-challenges").value,
       learned:document.getElementById("wr-learned").value, improve:document.getElementById("wr-improve").value
     });
-    closeSheet(); toast("Weekly review saved");
+    closeSheet(); toast((type==="monthly"?"Monthly":"Weekly")+" review saved");
   };
 }
 
@@ -1145,11 +1762,28 @@ function openSettingsSheet(){
     <div class="sheet-title">Settings</div>
     <label>Your name</label><input id="st-name" value="${esc(SETTINGS.name)}">
     <label>Currency label</label><input id="st-currency" value="${esc(SETTINGS.currency)}">
+    <label>Theme</label>
+    <div class="chips">
+      <span class="chip ${SETTINGS.theme!=='light'?'active':''}" id="st-theme-dark">🌙 Dark</span>
+      <span class="chip ${SETTINGS.theme==='light'?'active':''}" id="st-theme-light">☀️ Light</span>
+    </div>
     <label>App PIN lock</label>
     <div class="btn-row">
       <button class="btn ghost sm" id="st-setpin">${SETTINGS.pinHash? "Change PIN":"Set PIN"}</button>
       ${SETTINGS.pinHash? `<button class="btn ghost sm" id="st-clearpin">Turn off PIN</button>`:""}
     </div>
+    <label>Biometric unlock</label>
+    <div class="btn-row">
+      <button class="btn ghost sm" id="st-biometric">${SETTINGS.webauthnId? "Re-enable fingerprint/Face ID":"Enable fingerprint/Face ID"}</button>
+      ${SETTINGS.webauthnId? `<button class="btn ghost sm" id="st-biometric-off">Turn off</button>`:""}
+    </div>
+    <p class="field-hint">Requires a PIN to be set first, and a device with fingerprint/Face ID support.</p>
+    <label>Notifications</label>
+    <div class="btn-row">
+      <button class="btn ghost sm" id="st-notif-on" style="${SETTINGS.notificationsOn?'display:none;':''}">Enable notifications</button>
+      <button class="btn ghost sm" id="st-notif-off" style="${!SETTINGS.notificationsOn?'display:none;':''}">Turn off</button>
+    </div>
+    <p class="field-hint">Uses your phone's default notification sound and vibration. Fires while Life OS is open — this is a fully offline app, so background push isn't possible without a server.</p>
     <div style="margin-top:22px;">
       <button class="btn danger sm" id="st-wipe">Delete all data</button>
     </div>
@@ -1161,9 +1795,19 @@ function openSettingsSheet(){
     await DB.put("settings", SETTINGS);
     closeSheet(); toast("Settings saved"); setTab(STATE.tab);
   };
-  document.getElementById("st-setpin").onclick = ()=> promptSetPin();
+  document.getElementById("st-theme-dark").onclick = async ()=>{ SETTINGS.theme="dark"; await DB.put("settings",SETTINGS); applyTheme(); openSettingsSheet(); };
+  document.getElementById("st-theme-light").onclick = async ()=>{ SETTINGS.theme="light"; await DB.put("settings",SETTINGS); applyTheme(); openSettingsSheet(); };
+  document.getElementById("st-setpin").onclick = ()=> openPinSetupSheet();
   const cp = document.getElementById("st-clearpin");
-  if(cp) cp.onclick = async ()=>{ SETTINGS.pinHash=null; await DB.put("settings", SETTINGS); toast("PIN lock off"); closeSheet(); };
+  if(cp) cp.onclick = async ()=>{ SETTINGS.pinHash=null; SETTINGS.webauthnId=null; await DB.put("settings", SETTINGS); toast("PIN lock off"); closeSheet(); };
+  document.getElementById("st-biometric").onclick = async ()=>{
+    if(!SETTINGS.pinHash){ toast("Set a PIN first, as a fallback"); return; }
+    await enableBiometric(); openSettingsSheet();
+  };
+  const bo = document.getElementById("st-biometric-off");
+  if(bo) bo.onclick = async ()=>{ SETTINGS.webauthnId=null; await DB.put("settings",SETTINGS); renderLockExtras(); openSettingsSheet(); };
+  document.getElementById("st-notif-on").onclick = async ()=>{ await enableNotifications(); openSettingsSheet(); };
+  document.getElementById("st-notif-off").onclick = async ()=>{ await disableNotifications(); toast("Notifications off"); openSettingsSheet(); };
   document.getElementById("st-wipe").onclick = ()=>{
     closeSheet();
     setTimeout(()=>{
@@ -1176,14 +1820,48 @@ function openSettingsSheet(){
     }, 300);
   };
 }
-async function promptSetPin(){
-  const p1 = prompt("Enter a new 4-digit PIN:");
-  if(!p1 || !/^\d{4}$/.test(p1)){ if(p1!==null) toast("PIN must be 4 digits"); return; }
-  const p2 = prompt("Confirm PIN:");
-  if(p1!==p2){ toast("PINs did not match"); return; }
-  SETTINGS.pinHash = await hashPin(p1);
-  await DB.put("settings", SETTINGS);
-  toast("PIN set"); closeSheet();
+
+/* Styled PIN setup — reuses the same pin-pad/pin-dots visuals as the lock screen. */
+function openPinSetupSheet(){
+  let stage = "enter", firstPin = "", buf = "";
+  openSheet(`
+    <div class="sheet-title" id="ps-title">Enter a new 4-digit PIN</div>
+    <div class="pin-dots" id="ps-dots" style="margin:20px auto;"></div>
+    <div class="pin-pad" id="ps-pad" style="margin:0 auto;"></div>
+  `);
+  const dotsEl = document.getElementById("ps-dots"), titleEl = document.getElementById("ps-title"), padEl = document.getElementById("ps-pad");
+  function draw(){ dotsEl.innerHTML = [0,1,2,3].map(i=>`<div class="pin-dot ${i<buf.length?'filled':''}"></div>`).join(""); }
+  padEl.innerHTML = "";
+  ["1","2","3","4","5","6","7","8","9","","0","⌫"].forEach(k=>{
+    const b = document.createElement("button");
+    b.className="pin-key"; b.textContent=k; if(k==="") b.style.visibility="hidden";
+    b.addEventListener("click", async ()=>{
+      if(k==="⌫"){ buf=buf.slice(0,-1); draw(); return; }
+      if(buf.length>=4) return;
+      buf+=k; draw();
+      if(buf.length===4){
+        if(stage==="enter"){
+          firstPin = buf; buf=""; stage="confirm";
+          titleEl.textContent = "Confirm your PIN";
+          setTimeout(draw, 150);
+        } else {
+          if(buf===firstPin){
+            SETTINGS.pinHash = await hashPin(buf);
+            await DB.put("settings", SETTINGS);
+            if(navigator.vibrate) navigator.vibrate(30);
+            toast("PIN set"); closeSheet(); openSettingsSheet();
+          } else {
+            if(navigator.vibrate) navigator.vibrate([60,40,60]);
+            toast("PINs didn't match — try again");
+            buf=""; stage="enter"; firstPin=""; titleEl.textContent="Enter a new 4-digit PIN";
+            setTimeout(draw, 150);
+          }
+        }
+      }
+    });
+    padEl.appendChild(b);
+  });
+  draw();
 }
 async function hashPin(pin){
   const enc = new TextEncoder().encode("lifeos-salt-"+pin);
@@ -1224,11 +1902,24 @@ function openBackupSheet(){
     reader.readAsText(file);
   };
 }
+function blobToDataURL(blob){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(blob); });
+}
+async function dataURLToBlob(dataUrl){
+  const res = await fetch(dataUrl); return await res.blob();
+}
 async function exportBackup(){
   const data = {app:"lifeos", version:1, exportDate:nowISO(), stores:{}};
   let recordCount = 0;
   for(const s of STORES){
-    const all = await DB.getAll(s.name);
+    let all = await DB.getAll(s.name);
+    // Document blobs can't survive JSON.stringify — inline them as data URLs.
+    if(s.name==="documents"){
+      all = await Promise.all(all.map(async r=>{
+        if(r.blob instanceof Blob){ const dataUrl = await blobToDataURL(r.blob); return {...r, blob:undefined, blobDataUrl:dataUrl}; }
+        return r;
+      }));
+    }
     data.stores[s.name] = all;
     recordCount += all.length;
   }
@@ -1244,8 +1935,14 @@ async function exportBackup(){
 async function importBackup(data, mode){
   if(!data || data.app!=="lifeos" || !data.stores){ throw new Error("Invalid backup"); }
   for(const s of STORES){
-    const records = data.stores[s.name];
+    let records = data.stores[s.name];
     if(!records) continue;
+    if(s.name==="documents"){
+      records = await Promise.all(records.map(async r=>{
+        if(r.blobDataUrl){ const blob = await dataURLToBlob(r.blobDataUrl); return {...r, blob, blobDataUrl:undefined}; }
+        return r;
+      }));
+    }
     if(mode==="replace") await DB.clear(s.name);
     for(const r of records){ await DB.put(s.name, r); }
   }
@@ -1259,13 +1956,13 @@ function openAboutSheet(){
   openSheet(`
     <div class="sheet-title">About Life OS</div>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Phase 1 of your Personal Life OS. Fully offline, all data in IndexedDB on this device — no servers, no accounts, no tracking.
+    Your Personal Life OS. Fully offline, all data in IndexedDB on this device — no servers, no accounts, no tracking.
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Live now: Dashboard with life-balance ring, Tasks, Reminders, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals, Habits with streaks, Journal, Mood, Gratitude, Weekly review, global search, quick add, PIN lock, and full JSON backup/restore.
+    Live now: Dashboard with life-balance ring, Tasks, Reminders, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals, Habits with streaks, Journal, Mood, Gratitude, Reading tracker with streaks, Fitness log, Inventory, Contacts, local Document vault, Travel planner (itinerary + expenses), Places & bucket list, Life timeline, auto-computed Achievements, Weekly & Monthly review, global search, quick add, PIN lock, and full JSON backup/restore.
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Planned next: Inventory, Document vault, Contacts, Reading & Workout trackers, Travel planner, Life timeline, Achievements, and Monthly review.
+    Still on the roadmap: Food & Entertainment trackers, a dedicated Learning tracker, richer personal analytics, and a formal Reports screen.
     </p>
   `);
 }
@@ -1308,17 +2005,24 @@ async function handlePinKey(k){
   if(pinBuffer.length===4){
     const hash = await hashPin(pinBuffer);
     if(hash===SETTINGS.pinHash){
+      if(navigator.vibrate) navigator.vibrate(30);
       document.getElementById("lock-screen").classList.remove("show");
       pinBuffer = ""; lastActive = Date.now();
     } else {
+      if(navigator.vibrate) navigator.vibrate([60,40,60]);
       setTimeout(()=>{ pinBuffer=""; renderPinDots(); toast("Incorrect PIN"); }, 200);
     }
   }
+}
+function renderLockExtras(){
+  document.getElementById("lock-fingerprint").style.display = SETTINGS.webauthnId ? "inline-flex" : "none";
 }
 function showLock(){
   if(!SETTINGS.pinHash) return;
   pinBuffer=""; renderPinDots();
   document.getElementById("lock-screen").classList.add("show");
+  renderLockExtras();
+  if(SETTINGS.webauthnId) tryBiometricUnlock(true);
 }
 let lastActive = Date.now();
 document.addEventListener("visibilitychange", ()=>{
@@ -1331,11 +2035,129 @@ document.addEventListener("visibilitychange", ()=>{
 document.getElementById("lock-btn").addEventListener("click", ()=>{ if(SETTINGS.pinHash) showLock(); else toast("Set a PIN in Settings first"); });
 document.getElementById("lock-forgot").addEventListener("click", ()=>{
   if(confirm("Resetting removes the PIN but keeps all your data. Continue?")){
-    SETTINGS.pinHash=null; DB.put("settings", SETTINGS).then(()=>{
+    SETTINGS.pinHash=null; SETTINGS.webauthnId=null; DB.put("settings", SETTINGS).then(()=>{
       document.getElementById("lock-screen").classList.remove("show"); toast("PIN removed");
     });
   }
 });
+
+/* =========================================================================
+   BIOMETRIC UNLOCK — WebAuthn platform authenticator (Face ID / fingerprint).
+   This app has no server, so there's nothing to verify a signature against;
+   a successful, unphished platform-authenticator ceremony is treated as
+   proof of the device owner's biometric, which is enough for a local gate.
+   ========================================================================= */
+function b64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function unb64(s){ return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
+async function biometricAvailable(){
+  return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+}
+async function enableBiometric(){
+  if(!(await biometricAvailable())){ toast("Fingerprint/Face unlock isn't available on this device/browser"); return; }
+  try{
+    const userId = crypto.getRandomValues(new Uint8Array(16));
+    const cred = await navigator.credentials.create({publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp:{name:"Life OS"},
+      user:{id:userId, name:"lifeos-local", displayName: SETTINGS.name||"Life OS"},
+      pubKeyCredParams:[{type:"public-key", alg:-7},{type:"public-key", alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:"platform", userVerification:"required"},
+      timeout:60000
+    }});
+    SETTINGS.webauthnId = b64(cred.rawId);
+    await DB.put("settings", SETTINGS);
+    renderLockExtras();
+    toast("Fingerprint/Face unlock enabled");
+  }catch(e){ toast("Could not set up biometric unlock"); }
+}
+async function tryBiometricUnlock(silent){
+  if(!SETTINGS.webauthnId) return;
+  try{
+    await navigator.credentials.get({publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials:[{id:unb64(SETTINGS.webauthnId), type:"public-key"}],
+      userVerification:"required", timeout:60000
+    }});
+    if(navigator.vibrate) navigator.vibrate(30);
+    document.getElementById("lock-screen").classList.remove("show");
+    lastActive = Date.now();
+  }catch(e){ if(!silent) toast("Fingerprint not recognized — use your PIN"); }
+}
+document.getElementById("lock-fingerprint").addEventListener("click", ()=> tryBiometricUnlock(false));
+
+/* =========================================================================
+   NOTIFICATIONS — local notifications with device sound + vibration while
+   the app is open. Fully offline (no push server), so this checks on a
+   timer rather than waking the app from the background.
+   ========================================================================= */
+let notifyInterval = null;
+async function enableNotifications(){
+  if(!("Notification" in window)){ toast("Notifications aren't supported in this browser"); return false; }
+  const perm = await Notification.requestPermission();
+  if(perm!=="granted"){ toast("Notification permission not granted"); return false; }
+  SETTINGS.notificationsOn = true;
+  await DB.put("settings", SETTINGS);
+  startNotificationEngine();
+  toast("Notifications enabled");
+  return true;
+}
+async function disableNotifications(){
+  SETTINGS.notificationsOn = false;
+  await DB.put("settings", SETTINGS);
+  if(notifyInterval){ clearInterval(notifyInterval); notifyInterval=null; }
+}
+function startNotificationEngine(){
+  if(notifyInterval) return;
+  checkDueNotifications();
+  notifyInterval = setInterval(checkDueNotifications, 60000);
+}
+async function fireNotification(title, body, tag){
+  if(navigator.vibrate) navigator.vibrate([200,100,200]);
+  if(Notification.permission!=="granted") return;
+  try{
+    const reg = await navigator.serviceWorker.getRegistration();
+    const opts = {body, tag, vibrate:[200,100,200], icon:"./icon-192.png", badge:"./icon-192.png"};
+    if(reg && reg.showNotification) reg.showNotification(title, opts);
+    else new Notification(title, opts);
+  }catch(e){ new Notification(title, {body}); }
+}
+async function checkDueNotifications(){
+  if(!SETTINGS.notificationsOn) return;
+  const today = todayStr();
+  const [reminders, subs, docs, contacts] = await Promise.all([
+    DB.getAll("reminders"), DB.getAll("subscriptions"), DB.getAll("documents"), DB.getAll("contacts")
+  ]);
+  const notified = SETTINGS._notifiedToday===today ? (SETTINGS._notifiedIds||[]) : [];
+  const newlyNotified = [...notified];
+  for(const r of reminders){
+    if(!r.done && r.dueDate===today && !notified.includes("rem-"+r.id)){
+      fireNotification("Reminder", r.title, "rem-"+r.id); newlyNotified.push("rem-"+r.id);
+    }
+  }
+  for(const s of subs){
+    if(s.nextPaymentDate===today && !notified.includes("sub-"+s.id)){
+      fireNotification("Payment due today", s.name+" • "+fmtMoney(s.amount), "sub-"+s.id); newlyNotified.push("sub-"+s.id);
+    }
+  }
+  for(const d of docs){
+    const days = d.expiryDate? daysUntil(d.expiryDate): null;
+    if(days===30 && !notified.includes("doc-"+d.id)){
+      fireNotification("Document expiring soon", d.name+" expires in 30 days", "doc-"+d.id); newlyNotified.push("doc-"+d.id);
+    }
+  }
+  for(const c of contacts){
+    if(c.birthday && c.birthday.slice(5)===today.slice(5) && !notified.includes("bday-"+c.id)){
+      fireNotification("Birthday today 🎂", c.name+"'s birthday", "bday-"+c.id); newlyNotified.push("bday-"+c.id);
+    }
+    if(c.nextFollowUp===today && !notified.includes("fu-"+c.id)){
+      fireNotification("Follow up", "Follow up with "+c.name, "fu-"+c.id); newlyNotified.push("fu-"+c.id);
+    }
+  }
+  if(newlyNotified.length!==notified.length){
+    SETTINGS._notifiedToday = today; SETTINGS._notifiedIds = newlyNotified;
+    await DB.put("settings", SETTINGS);
+  }
+}
 
 /* =========================================================================
    PWA: install prompt handling + update banner
@@ -1376,14 +2198,27 @@ document.getElementById("sheet-close").addEventListener("click", closeSheet);
 async function loadSettings(){
   const s = await DB.get("settings", "main");
   if(s) SETTINGS = Object.assign(SETTINGS, s);
-  else await DB.put("settings", SETTINGS);
+  if(!SETTINGS.name){ SETTINGS.name = "Darius"; }
+  await DB.put("settings", SETTINGS);
 }
+function applyTheme(){
+  document.body.classList.toggle("theme-light", SETTINGS.theme==="light");
+  document.getElementById("theme-btn").textContent = SETTINGS.theme==="light" ? "☀️" : "🌙";
+}
+document.getElementById("theme-btn").addEventListener("click", async ()=>{
+  SETTINGS.theme = SETTINGS.theme==="light" ? "dark" : "light";
+  await DB.put("settings", SETTINGS);
+  applyTheme();
+});
 
 async function init(){
   await DB.open();
   await loadSettings();
+  applyTheme();
   if(SETTINGS.pinHash) showLock();
   renderPinPad();
+  renderLockExtras();
+  if(SETTINGS.notificationsOn) startNotificationEngine();
   setTab("home");
 }
 init();

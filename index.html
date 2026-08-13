@@ -47,7 +47,7 @@ button{font-family:inherit;}
   border-bottom:1px solid var(--line);
 }
 .topbar h1{font-family:var(--font-display); font-size:20px; font-weight:600; margin:0; letter-spacing:0.2px;}
-.topbar .icon-btn{background:none;border:none;color:var(--paper);font-size:20px;cursor:pointer;padding:6px;border-radius:var(--r-sm);}
+.topbar .icon-btn{background:none;border:none;color:var(--paper);font-size:18px;cursor:pointer;padding:5px;border-radius:var(--r-sm);}
 .topbar .icon-btn:focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
 
 /* ---------- Screens ---------- */
@@ -57,14 +57,14 @@ main{flex:1; padding:16px 18px 100px;}
 @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
 
 /* ---------- Cards ---------- */
-.card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg); padding:16px; margin-bottom:14px;}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg); padding:16px; margin-bottom:14px; box-shadow:0 2px 10px rgba(0,0,0,0.18); transition:transform .15s ease, box-shadow .15s ease;}
 .card h2{font-family:var(--font-display); font-size:16px; margin:0 0 10px; font-weight:600; color:var(--paper);}
 .card h2 .em{margin-right:6px;}
 .section-label{font-size:11px; text-transform:uppercase; letter-spacing:1.2px; color:var(--fog-dim); margin:22px 0 8px; font-weight:600;}
 .section-label:first-child{margin-top:0;}
 
 /* ---------- Dashboard greeting ---------- */
-.greeting{font-family:var(--font-display); font-size:26px; font-weight:600; margin:4px 0 2px;}
+.greeting{font-family:var(--font-display); font-size:26px; font-weight:600; margin:4px 0 2px; letter-spacing:0.2px;}
 .greeting-date{color:var(--fog); font-size:13px; margin-bottom:18px;}
 
 /* ---------- Life Ring (signature element) ---------- */
@@ -76,25 +76,26 @@ main{flex:1; padding:16px 18px 100px;}
 
 /* ---------- Stat grid ---------- */
 .stat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
-.stat{background:var(--panel-2); border-radius:var(--r-md); padding:12px 10px; text-align:center;}
+.stat{background:var(--panel-2); border-radius:var(--r-md); padding:12px 10px; text-align:center; border:1px solid transparent; transition:border-color .15s ease;}
 .stat .n{font-family:var(--font-mono); font-size:19px; font-weight:600; color:var(--gold);}
 .stat .l{font-size:10.5px; color:var(--fog); margin-top:3px; line-height:1.3;}
 
 /* ---------- List rows ---------- */
 .row{
   display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid var(--line);
-  cursor:pointer;
+  cursor:pointer; transition:background .12s ease; border-radius:8px;
 }
+.row:active{background:var(--panel-2);}
 .row:last-child{border-bottom:none;}
 .row .row-icon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;background:var(--panel-2);}
 .row .row-body{flex:1; min-width:0;}
 .row .row-title{font-size:14.5px; font-weight:600; color:var(--paper); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .row .row-sub{font-size:12px; color:var(--fog); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .row .row-amt{font-family:var(--font-mono); font-size:13.5px; font-weight:600; flex:none;}
-.row .chk{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--fog-dim); flex:none; display:flex; align-items:center; justify-content:center;}
+.row .chk{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--fog-dim); flex:none; display:flex; align-items:center; justify-content:center; transition:all .15s ease;}
 .row .chk.done{background:var(--sage); border-color:var(--sage); color:var(--ink); font-weight:700;}
 .empty{text-align:center; padding:36px 10px; color:var(--fog);}
-.empty .em{font-size:32px; display:block; margin-bottom:10px;}
+.empty .em{font-size:32px; display:block; margin-bottom:10px; opacity:0.7;}
 .empty p{margin:0; font-size:13.5px; line-height:1.5;}
 
 /* ---------- Buttons ---------- */
@@ -102,10 +103,13 @@ main{flex:1; padding:16px 18px 100px;}
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
   background:var(--gold); color:#1A1406; border:none; border-radius:var(--r-md);
   padding:12px 16px; font-size:14px; font-weight:700; cursor:pointer; width:100%;
+  box-shadow:0 2px 8px rgba(217,169,79,0.25); transition:transform .1s ease, box-shadow .1s ease, opacity .1s ease;
 }
+.btn:active{transform:scale(0.97); box-shadow:0 1px 4px rgba(217,169,79,0.2);}
 .btn:focus-visible{outline:2px solid var(--paper); outline-offset:2px;}
-.btn.ghost{background:var(--panel-2); color:var(--paper); border:1px solid var(--line); font-weight:600;}
-.btn.danger{background:var(--clay); color:#241009;}
+.btn.ghost{background:var(--panel-2); color:var(--paper); border:1px solid var(--line); font-weight:600; box-shadow:none;}
+.btn.ghost:active{background:var(--line);}
+.btn.danger{background:var(--clay); color:#241009; box-shadow:0 2px 8px rgba(196,105,74,0.25);}
 .btn.sm{width:auto; padding:9px 14px; font-size:13px;}
 .btn-row{display:flex; gap:10px; margin-top:14px;}
 
@@ -115,6 +119,7 @@ label:first-child{margin-top:0;}
 input,select,textarea{
   width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--paper);
   border-radius:var(--r-sm); padding:11px 12px; font-size:14.5px; font-family:inherit;
+  transition:border-color .15s ease;
 }
 input:focus,select:focus,textarea:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);}
 textarea{min-height:80px; resize:vertical;}
@@ -127,19 +132,21 @@ nav.tabbar{
   display:flex; justify-content:center;
 }
 .tabbar-inner{max-width:560px; width:100%; display:flex; padding:6px 6px calc(6px + env(safe-area-inset-bottom));}
-.tab{flex:1; background:none; border:none; color:var(--fog-dim); display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 2px; cursor:pointer; border-radius:var(--r-sm);}
-.tab .ti{font-size:19px;}
+.tab{flex:1; background:none; border:none; color:var(--fog-dim); display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 2px; cursor:pointer; border-radius:var(--r-sm); transition:color .15s ease;}
+.tab .ti{font-size:19px; transition:transform .15s ease;}
 .tab .tl{font-size:10px; font-weight:600; letter-spacing:0.2px;}
 .tab.active{color:var(--gold);}
+.tab.active .ti{transform:translateY(-1px) scale(1.08);}
 .tab:focus-visible{outline:2px solid var(--gold);}
 
 /* ---------- FAB ---------- */
 .fab{
   position:fixed; right:calc(50% - 280px + 18px); bottom:78px; z-index:35;
   width:56px; height:56px; border-radius:50%; background:var(--gold); color:#1A1406;
-  border:none; font-size:26px; font-weight:400; box-shadow:0 6px 20px rgba(0,0,0,0.4); cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
+  border:none; font-size:26px; font-weight:400; box-shadow:0 6px 20px rgba(217,169,79,0.35), 0 2px 8px rgba(0,0,0,0.3); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; transition:transform .12s ease;
 }
+.fab:active{transform:scale(0.94);}
 @media (max-width:596px){ .fab{right:18px;} }
 .fab:focus-visible{outline:2px solid var(--paper);}
 
@@ -196,6 +203,13 @@ nav.tabbar{
 .pin-key{width:64px; height:64px; border-radius:50%; background:var(--panel-2); border:1px solid var(--line); color:var(--paper); font-size:20px; font-weight:600; cursor:pointer;}
 .pin-key:active{background:var(--panel);}
 
+/* ---------- Onboarding ---------- */
+#onboarding-screen{position:fixed; inset:0; z-index:220; background:radial-gradient(circle at 50% 0%, rgba(217,169,79,0.12), var(--ink) 60%); display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px; overflow-y:auto;}
+#onboarding-screen.show{display:flex;}
+.ob-dots{display:flex; gap:6px; justify-content:center; margin-bottom:18px;}
+.ob-dots span{width:6px; height:6px; border-radius:50%; background:var(--line);}
+.ob-dots span.active{background:var(--gold); width:18px; border-radius:3px; transition:all .2s ease;}
+
 /* ---------- Progress bar ---------- */
 .pbar{height:8px; background:var(--panel-2); border-radius:99px; overflow:hidden; margin-top:8px;}
 .pbar > div{height:100%; border-radius:99px;}
@@ -217,7 +231,8 @@ nav.tabbar{
 
   <header class="topbar">
     <h1 id="topbar-title">Life OS</h1>
-    <div style="display:flex; gap:4px;">
+    <div style="display:flex; gap:2px;">
+      <button class="icon-btn" id="assistant-btn" aria-label="Assistant">🤖</button>
       <button class="icon-btn" id="notif-btn" aria-label="Notifications" style="position:relative;">🔔<span id="notif-dot" style="display:none; position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%; background:var(--clay);"></span></button>
       <button class="icon-btn" id="search-btn" aria-label="Search">🔍</button>
       <button class="icon-btn" id="theme-btn" aria-label="Toggle theme">🌙</button>
@@ -268,6 +283,10 @@ nav.tabbar{
     <button class="btn ghost sm" id="lock-forgot" style="margin-top:14px; width:auto;">Forgot PIN? Reset app lock</button>
   </div>
 
+  <div id="onboarding-screen">
+    <div id="onboarding-content" style="width:100%; max-width:400px;"></div>
+  </div>
+
 </div>
 
 <script>
@@ -277,7 +296,7 @@ nav.tabbar{
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.6.0";
 const DB_NAME = "lifeos";
 const DB_VERSION = 5;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
@@ -367,7 +386,7 @@ const DB = {
 const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const todayStr = ()=> new Date().toISOString().slice(0,10);
 const nowISO = ()=> new Date().toISOString();
-let SETTINGS = {id:"main", name:"Darius", currency:"KSh", theme:"dark", pinHash:null, lockTimeoutMin:2, weekStart:1, notificationsOn:false, webauthnId:null, autoLocationOn:false};
+let SETTINGS = {id:"main", name:"Darius", currency:"KSh", theme:"dark", pinHash:null, lockTimeoutMin:2, weekStart:1, notificationsOn:false, webauthnId:null, autoLocationOn:false, onboardingComplete:false};
 
 function fmtMoney(n){
   const v = Number(n||0);
@@ -899,8 +918,13 @@ async function renderHome(){
   }
 
   el2.innerHTML = `
-    <div class="greeting">${greetingWord()}${SETTINGS.name? ", "+esc(SETTINGS.name):""} 👋</div>
-    <div class="greeting-date">${new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"})}</div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      ${profile&&profile.photo instanceof Blob? `<div id="home-avatar" style="width:48px; height:48px; border-radius:50%; overflow:hidden; flex:none; border:2px solid var(--gold); cursor:pointer;"></div>` : ""}
+      <div>
+        <div class="greeting">${greetingWord()}${SETTINGS.name? ", "+esc(SETTINGS.name):""} 👋</div>
+        <div class="greeting-date">${new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"})}</div>
+      </div>
+    </div>
 
     ${(age || milestones.length)? `
     <div class="card" data-open-custom="__profile__" style="background:linear-gradient(135deg, rgba(217,169,79,0.10), var(--panel) 55%); border-color:rgba(217,169,79,0.25);">
@@ -975,6 +999,13 @@ async function renderHome(){
   el2.querySelectorAll("[data-open-custom]").forEach(n=> n.addEventListener("click", ()=> pushModule("list", n.dataset.openCustom, null)));
   const homeUpdateBtn = el2.querySelector("#home-update-btn");
   if(homeUpdateBtn) homeUpdateBtn.addEventListener("click", applyUpdate);
+  const homeAvatar = document.getElementById("home-avatar");
+  if(homeAvatar && profile && profile.photo instanceof Blob){
+    homeAvatar.style.backgroundImage = `url(${URL.createObjectURL(profile.photo)})`;
+    homeAvatar.style.backgroundSize = "cover";
+    homeAvatar.style.backgroundPosition = "center";
+    homeAvatar.addEventListener("click", ()=> pushModule("list","__profile__",null));
+  }
   updateNotifBadge();
 }
 
@@ -1276,7 +1307,8 @@ const CUSTOM_SCREENS = {
   "__calendar__": {label:"Calendar", render:renderCalendarScreen},
   "__profile__": {label:"About Me", render:renderProfileScreen},
   "__locations__": {label:"Location log", render:renderLocationsScreen},
-  "__photos__": {label:"Photos", render:renderPhotosScreen}
+  "__photos__": {label:"Photos", render:renderPhotosScreen},
+  "__assistant__": {label:"Assistant", render:renderAssistantScreen}
 };
 async function renderModuleScreen(){
   const top = STATE.stack[STATE.stack.length-1];
@@ -1387,7 +1419,7 @@ async function renderModuleForm(el2, modKey, cfg, id){
   }
 }
 function fieldHTML(f, existing){
-  const val = existing? (existing[f.key]!=null? existing[f.key]:"") : (f.type==="date"? "" : "");
+  const val = existing? (existing[f.key]!=null? existing[f.key]:"") : (f.type==="date"? todayStr() : "");
   if(f.type==="textarea") return `<label>${f.label}</label><textarea id="mf_${f.key}">${esc(val)}</textarea>`;
   if(f.type==="select") return `<label>${f.label}</label><select id="mf_${f.key}">${f.options.map(o=>`<option ${String(val)===o?'selected':''}>${esc(o)}</option>`).join("")}</select>`;
   return `<label>${f.label}</label><input id="mf_${f.key}" type="${f.type}" value="${esc(val)}" ${f.type==='number'?'step="any"':''}>`;
@@ -1873,6 +1905,14 @@ async function renderProfileScreen(el2){
 
   el2.innerHTML = `
     <button class="detail-back" data-back>← Back</button>
+    <div class="card" style="text-align:center;">
+      <div id="pf-avatar-wrap" style="display:inline-block; position:relative; cursor:pointer;">
+        <div id="pf-avatar" style="width:88px; height:88px; border-radius:50%; background:var(--panel-2); border:2px solid var(--line); display:flex; align-items:center; justify-content:center; overflow:hidden; font-size:32px; margin:0 auto;">🧑</div>
+        <div style="position:absolute; bottom:0; right:0; width:28px; height:28px; border-radius:50%; background:var(--gold); display:flex; align-items:center; justify-content:center; font-size:13px; border:2px solid var(--panel);">📷</div>
+      </div>
+      <input type="file" id="pf-photo-input" accept="image/*" style="display:none;">
+      <p style="font-size:12px; color:var(--fog); margin:10px 0 0;">Tap to ${p.photo?'change':'add'} your photo${p.photo?' · <span id="pf-photo-remove" style="color:var(--clay); cursor:pointer;">remove</span>':''}</p>
+    </div>
     <div class="card">
       <h2><span class="em">🧑</span>About Me</h2>
       <label>Birthday</label><input id="pf-birthday" type="date" value="${p.birthday||''}">
@@ -1925,6 +1965,28 @@ async function renderProfileScreen(el2){
     </div>
   `;
   el2.querySelector("[data-back]").addEventListener("click", popModule);
+
+  const avatarEl = document.getElementById("pf-avatar");
+  let avatarUrl = null;
+  if(p.photo instanceof Blob){ avatarUrl = URL.createObjectURL(p.photo); avatarEl.innerHTML = `<img src="${avatarUrl}" style="width:100%; height:100%; object-fit:cover;">`; }
+  const photoInput = document.getElementById("pf-photo-input");
+  document.getElementById("pf-avatar-wrap").addEventListener("click", ()=> photoInput.click());
+  photoInput.addEventListener("change", async ()=>{
+    const file = photoInput.files[0];
+    if(!file) return;
+    p.photo = file;
+    await DB.put("profile", p);
+    toast("Photo updated");
+    renderProfileScreen(el2);
+  });
+  const removeBtn = document.getElementById("pf-photo-remove");
+  if(removeBtn) removeBtn.addEventListener("click", async (e)=>{
+    e.stopPropagation();
+    p.photo = null;
+    await DB.put("profile", p);
+    toast("Photo removed");
+    renderProfileScreen(el2);
+  });
 
   if(p.sex==="Female"){
     const lastCycle = (await DB.getAll("cycleLogs")).sort((a,b)=>(b.date||"")<(a.date||"")?-1:1)[0];
@@ -2189,6 +2251,183 @@ function openPhotoViewer(p, url, el2){
 }
 
 /* =========================================================================
+   ASSISTANT — a local, rule-based helper that answers questions using only
+   what's already in your Life OS data. This is NOT a general-purpose AI: a
+   fully offline, no-backend app has nowhere to send a prompt to an LLM
+   without breaking the whole local-first design. So instead, this reads
+   your own tasks/money/goals/habits/etc. and answers directly from them.
+   ========================================================================= */
+let assistantMessages = [];
+async function renderAssistantScreen(el2){
+  if(!assistantMessages.length){
+    assistantMessages.push({from:"bot", text:`Hey ${SETTINGS.name||"there"} 👋 I'm your Life OS assistant. I only know what's stored in this app — no internet, no general knowledge — so ask me things like "what's due today", "how much have I spent this month", "how are my goals going", or "when's my next period".`});
+  }
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <div id="ax-messages" style="display:flex; flex-direction:column; gap:10px; margin-bottom:90px;"></div>
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  renderAssistantMessages();
+
+  // Floating input bar, pinned above the tab bar, only while this screen is open.
+  let bar = document.getElementById("ax-inputbar");
+  if(!bar){
+    bar = document.createElement("div");
+    bar.id = "ax-inputbar";
+    bar.style.cssText = "position:fixed; left:0; right:0; bottom:70px; z-index:25; display:flex; justify-content:center; padding:10px 18px;";
+    bar.innerHTML = `
+      <div style="max-width:560px; width:100%; display:flex; gap:8px; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:8px; box-shadow:0 4px 16px rgba(0,0,0,0.3);">
+        <input id="ax-input" placeholder="Ask about your day, money, goals…" style="border:none; background:none; box-shadow:none;">
+        <button class="btn sm" id="ax-send" style="border-radius:12px;">Send</button>
+      </div>
+    `;
+    document.body.appendChild(bar);
+  }
+  bar.style.display = "flex";
+  const input = document.getElementById("ax-input");
+  const send = async ()=>{
+    const q = input.value.trim();
+    if(!q) return;
+    assistantMessages.push({from:"user", text:q});
+    input.value = "";
+    renderAssistantMessages();
+    const reply = await assistantRespond(q);
+    assistantMessages.push({from:"bot", text:reply});
+    renderAssistantMessages();
+  };
+  document.getElementById("ax-send").onclick = send;
+  input.addEventListener("keydown", (e)=>{ if(e.key==="Enter") send(); });
+
+  // Clean up the floating bar when navigating away from this screen.
+  const cleanup = ()=>{ const b = document.getElementById("ax-inputbar"); if(b) b.style.display="none"; };
+  const observer = new MutationObserver(()=>{
+    if(!document.getElementById("screen-module").classList.contains("active") || STATE.stack[STATE.stack.length-1]?.module!=="__assistant__"){
+      cleanup(); observer.disconnect();
+    }
+  });
+  observer.observe(document.getElementById("screen-module"), {attributes:true, attributeFilter:["class"]});
+}
+function renderAssistantMessages(){
+  const wrap = document.getElementById("ax-messages");
+  if(!wrap) return;
+  wrap.innerHTML = assistantMessages.map(m=> m.from==="bot"
+    ? `<div style="align-self:flex-start; max-width:85%; background:var(--panel-2); border:1px solid var(--line); border-radius:14px 14px 14px 4px; padding:10px 13px; font-size:13.5px; line-height:1.5; color:var(--paper);">${esc(m.text)}</div>`
+    : `<div style="align-self:flex-end; max-width:85%; background:var(--gold); color:#1A1406; border-radius:14px 14px 4px 14px; padding:10px 13px; font-size:13.5px; line-height:1.5; font-weight:600;">${esc(m.text)}</div>`
+  ).join("");
+  wrap.scrollIntoView({block:"end"});
+}
+async function assistantRespond(qRaw){
+  const q = qRaw.toLowerCase();
+  const name = SETTINGS.name || "";
+  const today = todayStr();
+
+  if(/\b(hi|hello|hey|sup)\b/.test(q) && q.length<20){
+    return `Hey${name?" "+name:""}! What would you like to know — your tasks, money, goals, habits, or something else?`;
+  }
+
+  if(/period|cycle|menstru/.test(q)){
+    const profile = await DB.get("profile","main");
+    if(!profile || profile.sex!=="Female") return "Cycle tracking isn't set up — set your sex to Female in Profile to enable it.";
+    const logs = await DB.getAll("cycleLogs");
+    if(!logs.length) return "No cycle logged yet — add your first period in the Cycle log to get predictions.";
+    const last = logs.sort((a,b)=>(b.date||"")<(a.date||"")?-1:1)[0];
+    const next = new Date(last.date+"T00:00:00");
+    next.setDate(next.getDate() + Number(profile.avgCycleLength||28));
+    const nextStr = next.toISOString().slice(0,10);
+    const d = daysUntil(nextStr);
+    return `Based on your last logged period (${fmtDate(last.date)}), your next one is expected around ${fmtDate(nextStr)}${d!=null?" — that's "+(d>=0?"in "+d+" day"+(d===1?"":"s"):Math.abs(d)+" day"+(Math.abs(d)===1?"":"s")+" late"):""}.`;
+  }
+
+  if(/how old|my age|birthday/.test(q)){
+    const profile = await DB.get("profile","main");
+    const age = profile? yearsMonthsSince(profile.birthday) : null;
+    if(!age) return "I don't have your birthday yet — add it in Profile and I'll be able to tell you.";
+    return `You're ${age.years} year${age.years===1?"":"s"}${age.months?" and "+age.months+" month"+(age.months===1?"":"s"):""} old today.`;
+  }
+
+  if(/weight|bmi|height/.test(q)){
+    const logs = await DB.getAll("bodyLogs");
+    if(!logs.length) return "No weight/height logged yet — add an entry from Profile → Log weight/height.";
+    const last = logs.sort((a,b)=>(b.date||"")<(a.date||"")?-1:1)[0];
+    const bmi = (last.weight&&last.height)? (last.weight/((last.height/100)**2)).toFixed(1) : null;
+    return `As of ${fmtDate(last.date)}: ${last.weight?last.weight+"kg":"no weight logged"}${last.height?", "+last.height+"cm":""}${bmi?", BMI "+bmi:""}.`;
+  }
+
+  if(/sleep|slept/.test(q)){
+    const logs = await DB.getAll("sleepLogs");
+    if(!logs.length) return "No sleep logged yet — add one from the Sleep log.";
+    const last = logs.sort((a,b)=>(b.date||"")<(a.date||"")?-1:1)[0];
+    if(!last.bedTime || !last.wakeTime) return `Your last sleep entry (${fmtDate(last.date)}) doesn't have both times logged.`;
+    const [bh,bm]=last.bedTime.split(":").map(Number), [wh,wm]=last.wakeTime.split(":").map(Number);
+    let mins = (wh*60+wm)-(bh*60+bm); if(mins<0) mins+=24*60;
+    return `On ${fmtDate(last.date)} you slept from ${last.bedTime} to ${last.wakeTime} — about ${(mins/60).toFixed(1)} hours.`;
+  }
+
+  if(/spend|expense|money|budget/.test(q)){
+    const expenses = await DB.getAll("expenses");
+    const income = await DB.getAll("income");
+    const ym = today.slice(0,7);
+    const monthExp = expenses.filter(e=>e.date && e.date.slice(0,7)===ym);
+    const total = monthExp.reduce((s,e)=>s+Number(e.amount||0),0);
+    const monthInc = income.filter(i=>i.date && i.date.slice(0,7)===ym).reduce((s,i)=>s+Number(i.amount||0),0);
+    const byCat = {}; monthExp.forEach(e=> byCat[e.category]=(byCat[e.category]||0)+Number(e.amount||0));
+    const top = Object.entries(byCat).sort((a,b)=>b[1]-a[1])[0];
+    return `This month you've spent ${fmtMoney(total)} and earned ${fmtMoney(monthInc)}, net ${fmtMoney(monthInc-total)}.${top?" Your top category is "+top[0]+" at "+fmtMoney(top[1])+".":""}`;
+  }
+
+  if(/debt|owe/.test(q)){
+    const debts = await DB.getAll("debts");
+    const owed = debts.filter(d=>d.direction==="They owe me").reduce((s,d)=>s+Number(d.remaining!=null?d.remaining:d.amount||0),0);
+    const owe = debts.filter(d=>d.direction==="I owe them").reduce((s,d)=>s+Number(d.remaining!=null?d.remaining:d.amount||0),0);
+    if(!debts.length) return "No debts tracked right now.";
+    return `People owe you ${fmtMoney(owed)}, and you owe ${fmtMoney(owe)}.`;
+  }
+
+  if(/subscription|bill|payment/.test(q)){
+    const subs = await DB.getAll("subscriptions");
+    const upcoming = subs.filter(s=> s.nextPaymentDate && daysUntil(s.nextPaymentDate)!=null && daysUntil(s.nextPaymentDate)>=0 && daysUntil(s.nextPaymentDate)<=14);
+    if(!upcoming.length) return "No subscription payments due in the next two weeks.";
+    return "Coming up: " + upcoming.map(s=> s.name+" ("+fmtMoney(s.amount)+", "+fmtDate(s.nextPaymentDate)+")").join("; ") + ".";
+  }
+
+  if(/goal/.test(q)){
+    const goals = await DB.getAll("personalGoals");
+    const active = goals.filter(g=>g.status!=="Completed");
+    const longTerm = active.filter(g=>g.term==="Long-term");
+    if(!goals.length) return "No goals set yet — add one from the Grow tab.";
+    return `You have ${active.length} active goal${active.length===1?"":"s"}${longTerm.length?` (${longTerm.length} long-term)`:""}, and ${goals.filter(g=>g.status==="Completed").length} completed.`;
+  }
+
+  if(/habit|streak/.test(q)){
+    const habits = await DB.getAll("habits");
+    if(!habits.length) return "No habits tracked yet — add one from the Grow tab.";
+    let best = {name:"", streak:0};
+    for(const h of habits){ const s = await habitStreak(h.id); if(s>best.streak) best={name:h.name, streak:s}; }
+    return best.streak>0 ? `Your best current streak is "${best.name}" at ${best.streak} day${best.streak===1?"":"s"}. You're tracking ${habits.length} habit${habits.length===1?"":"s"} total.` : `You're tracking ${habits.length} habit${habits.length===1?"":"s"}, but no active streak right now — check one off today to start one.`;
+  }
+
+  if(/reminder/.test(q)){
+    const reminders = await DB.getAll("reminders");
+    const todays = reminders.filter(r=>!r.done && reminderOccursOn(r, today));
+    if(!todays.length) return "No reminders for today.";
+    return "Today's reminders: " + todays.map(r=>r.title).join(", ") + ".";
+  }
+
+  if(/task|to.?do|due/.test(q)){
+    const tasks = await DB.getAll("tasks");
+    const overdue = tasks.filter(t=>!t.done && t.dueDate && t.dueDate<today);
+    const dueToday = tasks.filter(t=>!t.done && t.dueDate===today);
+    if(!dueToday.length && !overdue.length) return "Nothing due today, and nothing overdue. You're clear.";
+    let parts = [];
+    if(overdue.length) parts.push(`${overdue.length} overdue`);
+    if(dueToday.length) parts.push(`${dueToday.length} due today: ${dueToday.map(t=>t.title).join(", ")}`);
+    return parts.join(" — ") + ".";
+  }
+
+  return `I can only answer from what's in your Life OS data — try asking about tasks, spending, goals, habits, sleep, weight, debts, subscriptions, reminders${name?", or your age":""}. Try something like "what's due today" or "how are my goals going".`;
+}
+
+/* =========================================================================
    QUICK ADD (FAB)
    ========================================================================= */
 const QUICK_ACTIONS = [
@@ -2350,8 +2589,9 @@ function openSettingsSheet(){
     <div class="btn-row">
       <button class="btn ghost sm" id="st-notif-on" style="${SETTINGS.notificationsOn?'display:none;':''}">Enable notifications</button>
       <button class="btn ghost sm" id="st-notif-off" style="${!SETTINGS.notificationsOn?'display:none;':''}">Turn off</button>
+      ${SETTINGS.notificationsOn? `<button class="btn ghost sm" id="st-notif-test">🔔 Send test</button>`:""}
     </div>
-    <p class="field-hint">Uses your phone's default notification sound and vibration. Fires while Life OS is open — this is a fully offline app, so background push isn't possible without a server.</p>
+    <p class="field-hint">Uses your phone's default notification sound and vibration. Fires while Life OS is open — this is a fully offline app, so background push isn't possible without a server. On iPhone, notifications only work if you've added Life OS to your Home Screen (Share → Add to Home Screen) — Safari tabs can't show them at all.</p>
     <div style="margin-top:22px;">
       <button class="btn danger sm" id="st-wipe">Delete all data</button>
     </div>
@@ -2376,6 +2616,8 @@ function openSettingsSheet(){
   if(bo) bo.onclick = async ()=>{ SETTINGS.webauthnId=null; await DB.put("settings",SETTINGS); renderLockExtras(); openSettingsSheet(); };
   document.getElementById("st-notif-on").onclick = async ()=>{ await enableNotifications(); openSettingsSheet(); };
   document.getElementById("st-notif-off").onclick = async ()=>{ await disableNotifications(); toast("Notifications off"); openSettingsSheet(); };
+  const notifTest = document.getElementById("st-notif-test");
+  if(notifTest) notifTest.onclick = ()=> fireNotification("Test notification", "If you heard/felt that, notifications are working 🎉", "test-"+Date.now());
   document.getElementById("st-wipe").onclick = ()=>{
     closeSheet();
     setTimeout(()=>{
@@ -2486,16 +2728,18 @@ function blobToDataURL(blob){
 async function dataURLToBlob(dataUrl){
   const res = await fetch(dataUrl); return await res.blob();
 }
-const BLOB_STORES = ["documents","photos"]; // stores whose records may hold a Blob under `.blob`
+// Stores whose records may hold a Blob, and which field name holds it.
+const BLOB_FIELD_MAP = {documents:"blob", photos:"blob", profile:"photo"};
 async function exportBackup(){
   const data = {app:"lifeos", version:1, exportDate:nowISO(), stores:{}};
   let recordCount = 0;
   for(const s of STORES){
     let all = await DB.getAll(s.name);
     // Blobs can't survive JSON.stringify — inline them as data URLs.
-    if(BLOB_STORES.includes(s.name)){
+    const field = BLOB_FIELD_MAP[s.name];
+    if(field){
       all = await Promise.all(all.map(async r=>{
-        if(r.blob instanceof Blob){ const dataUrl = await blobToDataURL(r.blob); return {...r, blob:undefined, blobDataUrl:dataUrl}; }
+        if(r[field] instanceof Blob){ const dataUrl = await blobToDataURL(r[field]); return {...r, [field]:undefined, [field+"DataUrl"]:dataUrl}; }
         return r;
       }));
     }
@@ -2516,9 +2760,10 @@ async function importBackup(data, mode){
   for(const s of STORES){
     let records = data.stores[s.name];
     if(!records) continue;
-    if(BLOB_STORES.includes(s.name)){
+    const field = BLOB_FIELD_MAP[s.name];
+    if(field){
       records = await Promise.all(records.map(async r=>{
-        if(r.blobDataUrl){ const blob = await dataURLToBlob(r.blobDataUrl); return {...r, blob, blobDataUrl:undefined}; }
+        if(r[field+"DataUrl"]){ const blob = await dataURLToBlob(r[field+"DataUrl"]); return {...r, [field]:blob, [field+"DataUrl"]:undefined}; }
         return r;
       }));
     }
@@ -2538,7 +2783,7 @@ function openAboutSheet(){
     Your Personal Life OS. Fully offline, all data in IndexedDB on this device — no servers, no accounts, no tracking.
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Live now: Dashboard with life-balance ring, age & education timeline, and body metrics, About Me (birthday, sex, education, hobbies, fears), Tasks, Reminders with repeat, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals (short & long-term), Habits with streaks, Journal, Mood, Gratitude, Sleep log, Cycle log, Body metrics, Reading tracker with streaks, Fitness log, Inventory, Contacts, Friends & relationships, local Document vault, Photos, Travel planner (itinerary + expenses), Places & bucket list, Calendar with a full activity history, Life timeline, Location log (auto + manual), on-device app usage, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration, quick add, PIN + biometric lock, and full JSON backup/restore (built for moving to a new phone).
+    Live now: Dashboard with life-balance ring, age & education timeline, and body metrics, profile photo, About Me (birthday, sex, education, hobbies, fears), a local AI-free "Assistant" that answers questions from your own data, first-run onboarding, Tasks, Reminders with repeat, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals (short & long-term), Habits with streaks, Journal, Mood, Gratitude, Sleep log, Cycle log, Body metrics, Reading tracker with streaks, Fitness log, Inventory, Contacts, Friends & relationships, local Document vault, Photos, Travel planner (itinerary + expenses), Places & bucket list, Calendar with a full activity history, Life timeline, Location log (auto + manual), on-device app usage, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration (with a test button), quick add, PIN + biometric lock, light/dark theme, and full JSON backup/restore (built for moving to a new phone).
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
     Still on the roadmap: Food & Entertainment trackers, a dedicated Learning tracker, richer personal analytics, and a formal Reports screen.
@@ -2770,12 +3015,19 @@ function startNotificationEngine(){
 async function fireNotification(title, body, tag){
   if(navigator.vibrate) navigator.vibrate([200,100,200]);
   if(Notification.permission!=="granted") return;
+  const opts = {body, tag, vibrate:[200,100,200], icon:"./icon-192.png", badge:"./icon-192.png"};
   try{
-    const reg = await navigator.serviceWorker.getRegistration();
-    const opts = {body, tag, vibrate:[200,100,200], icon:"./icon-192.png", badge:"./icon-192.png"};
-    if(reg && reg.showNotification) reg.showNotification(title, opts);
-    else new Notification(title, opts);
-  }catch(e){ new Notification(title, {body}); }
+    if("serviceWorker" in navigator){
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((res)=> setTimeout(()=>res(null), 2000))
+      ]);
+      if(reg && reg.showNotification){ await reg.showNotification(title, opts); return; }
+    }
+    new Notification(title, opts);
+  }catch(e){
+    try{ new Notification(title, {body}); }catch(e2){ /* platform doesn't support local notifications at all (e.g. iOS Safari not installed to Home Screen) */ }
+  }
 }
 async function checkDueNotifications(){
   if(!SETTINGS.notificationsOn) return;
@@ -2851,6 +3103,7 @@ async function openNotificationsPanel(){
   if(en) en.addEventListener("click", async ()=>{ await enableNotifications(); openNotificationsPanel(); });
 }
 document.getElementById("notif-btn").addEventListener("click", openNotificationsPanel);
+document.getElementById("assistant-btn").addEventListener("click", ()=> pushModule("list","__assistant__",null));
 
 /* =========================================================================
    PWA: install prompt handling + update detection (banner + dashboard card)
@@ -2902,7 +3155,12 @@ document.getElementById("sheet-close").addEventListener("click", closeSheet);
 
 async function loadSettings(){
   const s = await DB.get("settings", "main");
-  if(s) SETTINGS = Object.assign(SETTINGS, s);
+  if(s){
+    // Grandfather in existing installs that predate onboarding — only truly
+    // new installs (no settings record at all) should see the first-run flow.
+    if(s.onboardingComplete===undefined) s.onboardingComplete = true;
+    SETTINGS = Object.assign(SETTINGS, s);
+  }
   if(!SETTINGS.name){ SETTINGS.name = "Darius"; }
   await DB.put("settings", SETTINGS);
 }
@@ -2916,6 +3174,95 @@ document.getElementById("theme-btn").addEventListener("click", async ()=>{
   applyTheme();
 });
 
+/* =========================================================================
+   FIRST-RUN ONBOARDING — collects the basics before you land on the app.
+   ========================================================================= */
+let obStep = 0;
+let obData = {name:"", birthday:"", sex:"", currency:"KSh"};
+const OB_STEPS = 3;
+function showOnboarding(){
+  obData.name = SETTINGS.name || "";
+  obData.currency = SETTINGS.currency || "KSh";
+  obStep = 0;
+  document.getElementById("onboarding-screen").classList.add("show");
+  renderOnboardingStep();
+}
+function renderOnboardingStep(){
+  const c = document.getElementById("onboarding-content");
+  const dots = `<div class="ob-dots">${Array.from({length:OB_STEPS}).map((_,i)=>`<span class="${i===obStep?'active':''}"></span>`).join("")}</div>`;
+
+  if(obStep===0){
+    c.innerHTML = `
+      ${dots}
+      <div style="text-align:center; margin-bottom:22px;">
+        <div style="font-size:36px;">👋</div>
+        <div style="font-family:var(--font-display); font-size:22px; font-weight:700; margin-top:8px;">Welcome to Life OS</div>
+        <p style="font-size:13px; color:var(--fog); margin-top:6px;">Let's set up your private, offline space. This only takes a minute — and everything you enter stays on this device.</p>
+      </div>
+      <label>What should I call you?</label><input id="ob-name" value="${esc(obData.name)}" placeholder="Your name">
+      <button class="btn" id="ob-next" style="margin-top:20px;">Continue</button>
+    `;
+    document.getElementById("ob-next").addEventListener("click", ()=>{
+      obData.name = document.getElementById("ob-name").value.trim() || obData.name;
+      obStep = 1; renderOnboardingStep();
+    });
+  } else if(obStep===1){
+    c.innerHTML = `
+      ${dots}
+      <div style="text-align:center; margin-bottom:18px;">
+        <div style="font-size:32px;">🧑</div>
+        <div style="font-family:var(--font-display); font-size:19px; font-weight:700; margin-top:8px;">A little about you</div>
+        <p style="font-size:12.5px; color:var(--fog); margin-top:6px;">Optional — skip anything you'd rather add later from your Profile.</p>
+      </div>
+      <label>Birthday</label><input id="ob-birthday" type="date" value="${obData.birthday}">
+      <label>Sex</label>
+      <select id="ob-sex">
+        <option value="" ${!obData.sex?'selected':''}>Prefer not to say</option>
+        <option value="Male" ${obData.sex==='Male'?'selected':''}>Male</option>
+        <option value="Female" ${obData.sex==='Female'?'selected':''}>Female</option>
+      </select>
+      <div class="btn-row">
+        <button class="btn ghost" id="ob-back">Back</button>
+        <button class="btn" id="ob-next">Continue</button>
+      </div>
+    `;
+    document.getElementById("ob-back").addEventListener("click", ()=>{ obStep=0; renderOnboardingStep(); });
+    document.getElementById("ob-next").addEventListener("click", ()=>{
+      obData.birthday = document.getElementById("ob-birthday").value;
+      obData.sex = document.getElementById("ob-sex").value;
+      obStep = 2; renderOnboardingStep();
+    });
+  } else {
+    c.innerHTML = `
+      ${dots}
+      <div style="text-align:center; margin-bottom:18px;">
+        <div style="font-size:32px;">💰</div>
+        <div style="font-family:var(--font-display); font-size:19px; font-weight:700; margin-top:8px;">Last thing</div>
+        <p style="font-size:12.5px; color:var(--fog); margin-top:6px;">What currency should Life OS use for money tracking?</p>
+      </div>
+      <label>Currency label</label><input id="ob-currency" value="${esc(obData.currency)}" placeholder="e.g. KSh, $, €">
+      <div class="btn-row">
+        <button class="btn ghost" id="ob-back">Back</button>
+        <button class="btn" id="ob-finish">Get started</button>
+      </div>
+    `;
+    document.getElementById("ob-back").addEventListener("click", ()=>{ obStep=1; renderOnboardingStep(); });
+    document.getElementById("ob-finish").addEventListener("click", async ()=>{
+      obData.currency = document.getElementById("ob-currency").value.trim() || "KSh";
+      SETTINGS.name = obData.name; SETTINGS.currency = obData.currency; SETTINGS.onboardingComplete = true;
+      await DB.put("settings", SETTINGS);
+      if(obData.birthday || obData.sex){
+        const p = (await DB.get("profile","main")) || {id:"main", customFacts:[]};
+        if(obData.birthday) p.birthday = obData.birthday;
+        if(obData.sex) p.sex = obData.sex;
+        await DB.put("profile", p);
+      }
+      document.getElementById("onboarding-screen").classList.remove("show");
+      setTab("home");
+    });
+  }
+}
+
 async function init(){
   await DB.open();
   await loadSettings();
@@ -2927,6 +3274,7 @@ async function init(){
   startUsageTracking();
   maybeAutoLogLocation();
   setTab("home");
+  if(!SETTINGS.onboardingComplete) showOnboarding();
 }
 init();
 

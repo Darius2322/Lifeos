@@ -277,7 +277,7 @@ nav.tabbar{
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.5.1";
 const DB_NAME = "lifeos";
 const DB_VERSION = 5;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
@@ -1208,7 +1208,7 @@ async function renderMore(){
   el2.innerHTML = `
     <div class="section-label">About Me</div>
     <div class="tile-grid">
-      <div class="tile" data-custom="__profile__"><div class="em">🧑</div><div class="l">Profile</div><div class="d">Birthday, education, hobbies, fears</div></div>
+      <div class="tile" data-custom="__profile__"><div class="em">🧑</div><div class="l">Profile</div><div class="d">Birthday, sex, education, hobbies, fears</div></div>
       <div class="tile" data-open="sleepLogs"><div class="em">😴</div><div class="l">Sleep</div></div>
       <div class="tile" data-open="bodyLogs"><div class="em">⚖️</div><div class="l">Weight & height</div></div>
       ${profile&&profile.sex==="Female"? `<div class="tile" data-open="cycleLogs"><div class="em">🌸</div><div class="l">Cycle log</div></div>`:""}

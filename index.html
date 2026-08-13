@@ -277,12 +277,14 @@ nav.tabbar{
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 const DB_NAME = "lifeos";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
 // travel (trips/itinerary/expenses), places/bucket list, timeline, importantDates.
 // Phase 3 adds: sleep log, on-device app-usage log, location log.
+// Phase 4 adds: photos.
+// Phase 5 adds: relationships, menstrual cycle log, body metrics log.
 // Bumping DB_VERSION triggers onupgradeneeded below, which only *adds* missing
 // stores — existing data from earlier phases is untouched.
 const STORES = [
@@ -322,7 +324,10 @@ const STORES = [
   {name:"sleepLogs", key:"id", indexes:["date"]},
   {name:"appUsageLogs", key:"id", indexes:["date"]},
   {name:"locationLogs", key:"id", indexes:["date"]},
-  {name:"photos", key:"id", indexes:["date"]}
+  {name:"photos", key:"id", indexes:["date"]},
+  {name:"relationships", key:"id", indexes:["type"]},
+  {name:"cycleLogs", key:"id", indexes:["date"]},
+  {name:"bodyLogs", key:"id", indexes:["date"]}
 ];
 
 const DB = {
@@ -509,13 +514,14 @@ const MODULES = {
     label:"Goals", icon:"🎯", color:"var(--gold)", store:"personalGoals",
     fields:[
       {key:"title", label:"Goal", type:"text", required:true},
+      {key:"term", label:"Term", type:"select", options:["Short-term","Long-term"]},
       {key:"category", label:"Category", type:"select", options:["Career","Finance","Health","Learning","Relationships","Personal","Other"]},
       {key:"targetDate", label:"Target date", type:"date"},
       {key:"progress", label:"Progress % (0-100)", type:"number"},
       {key:"status", label:"Status", type:"select", options:["Active","Completed","Paused"]},
       {key:"description", label:"Description", type:"textarea"}
     ],
-    title:r=>r.title, sub:r=> (r.category||"Goal")+" • "+(r.status||"Active")
+    title:r=>r.title, sub:r=> (r.term==="Long-term"?"🏔️ Long-term • ":"")+(r.category||"Goal")+" • "+(r.status||"Active")
   },
   journal: {
     label:"Journal", icon:"📖", color:"var(--violet)", store:"journal",
@@ -652,6 +658,38 @@ const MODULES = {
       let mins = (wh*60+wm) - (bh*60+bm); if(mins<0) mins += 24*60;
       return r.bedTime+" → "+r.wakeTime+" • "+(mins/60).toFixed(1)+"h"+(r.quality?" • quality "+r.quality+"/5":"");
     }
+  },
+  relationships: {
+    label:"Friends & relationships", icon:"💞", color:"var(--violet)", store:"relationships",
+    fields:[
+      {key:"name", label:"Name", type:"text", required:true},
+      {key:"type", label:"Type", type:"select", options:["Friend","Best Friend","Partner","Crush","Family","Ex","Other"]},
+      {key:"status", label:"Status", type:"select", options:["Active","Distant","Ended"]},
+      {key:"metDate", label:"How long known (since)", type:"date"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.name, sub:r=> (r.type||"Friend")+(r.status?" • "+r.status:"")
+  },
+  cycleLogs: {
+    label:"Cycle log", icon:"🌸", color:"var(--clay)", store:"cycleLogs",
+    fields:[
+      {key:"date", label:"Period start date", type:"date", required:true},
+      {key:"periodLength", label:"Period length (days)", type:"number"},
+      {key:"flow", label:"Flow", type:"select", options:["Light","Medium","Heavy"]},
+      {key:"symptoms", label:"Symptoms", type:"textarea"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>fmtDate(r.date), sub:r=> (r.flow?r.flow+" flow":"")+(r.periodLength?" • "+r.periodLength+"d":"")
+  },
+  bodyLogs: {
+    label:"Body metrics", icon:"⚖️", color:"var(--sage)", store:"bodyLogs",
+    fields:[
+      {key:"date", label:"Date", type:"date", required:true},
+      {key:"weight", label:"Weight (kg)", type:"number"},
+      {key:"height", label:"Height (cm)", type:"number"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>fmtDate(r.date), sub:r=> (r.weight?r.weight+"kg":"")+(r.height?" • "+r.height+"cm":"")
   }
 };
 
@@ -835,9 +873,9 @@ async function computeLifeScores(){
 async function renderHome(){
   document.getElementById("topbar-title").textContent = "Life OS";
   const el2 = document.getElementById("screen-home");
-  const [tasks, reminders, expenses, goals, habits, subs, journal, profile] = await Promise.all([
+  const [tasks, reminders, expenses, goals, habits, subs, journal, profile, bodyLogs] = await Promise.all([
     DB.getAll("tasks"), DB.getAll("reminders"), DB.getAll("expenses"), DB.getAll("personalGoals"),
-    DB.getAll("habits"), DB.getAll("subscriptions"), DB.getAll("journal"), DB.get("profile","main")
+    DB.getAll("habits"), DB.getAll("subscriptions"), DB.getAll("journal"), DB.get("profile","main"), DB.getAll("bodyLogs")
   ]);
   const today = todayStr();
   const todaysTasks = tasks.filter(t=>!t.done && (t.dueDate===today || !t.dueDate));
@@ -850,23 +888,46 @@ async function renderHome(){
   const top3 = tasks.filter(t=>!t.done && t.priority==="Top 3").slice(0,3);
   const wroteToday = journal.some(j=>j.date===today);
   const scores = await computeLifeScores();
+  const lastBody = bodyLogs.sort((a,b)=>(b.date||"")<(a.date||"")?-1:1)[0];
 
-  const aboutLines = [];
+  const age = profile? yearsMonthsSince(profile.birthday) : null;
+  const milestones = [];
   if(profile){
-    const age = yearsMonthsSince(profile.birthday);
-    if(age) aboutLines.push(`Today you are ${age.years}yr${age.months?" "+age.months+"mo":""}`);
-    if(profile.primaryFinishDate) aboutLines.push(`Finished primary school ${agoText(profile.primaryFinishDate)}`);
-    if(profile.highSchoolFinishDate) aboutLines.push(`Finished high school ${agoText(profile.highSchoolFinishDate)}`);
-    if(profile.collegeFinishDate) aboutLines.push(`Finished college ${agoText(profile.collegeFinishDate)}`);
+    if(profile.primaryFinishDate) milestones.push({icon:"🎒", label:"Primary school", ago:agoText(profile.primaryFinishDate)});
+    if(profile.highSchoolFinishDate) milestones.push({icon:"🎓", label:"High school", ago:agoText(profile.highSchoolFinishDate)});
+    if(profile.collegeFinishDate) milestones.push({icon:"🏛️", label:"College", ago:agoText(profile.collegeFinishDate)});
   }
 
   el2.innerHTML = `
     <div class="greeting">${greetingWord()}${SETTINGS.name? ", "+esc(SETTINGS.name):""} 👋</div>
     <div class="greeting-date">${new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"})}</div>
 
-    ${aboutLines.length? `
+    ${(age || milestones.length)? `
+    <div class="card" data-open-custom="__profile__" style="background:linear-gradient(135deg, rgba(217,169,79,0.10), var(--panel) 55%); border-color:rgba(217,169,79,0.25);">
+      ${age? `
+      <div style="display:flex; align-items:baseline; gap:8px;">
+        <span style="font-family:var(--font-display); font-size:34px; font-weight:700; color:var(--gold); line-height:1;">${age.years}</span>
+        <span style="font-size:13px; color:var(--fog); font-weight:600;">years${age.months? " "+age.months+" months":""} old today</span>
+      </div>` : ""}
+      ${milestones.length? `
+      <div style="display:flex; flex-direction:column; gap:8px; ${age?'margin-top:14px; padding-top:14px; border-top:1px solid var(--line);':''}">
+        ${milestones.map(m=>`
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:17px; width:22px; text-align:center;">${m.icon}</span>
+            <span style="font-size:13px; color:var(--paper); flex:1;">${m.label}</span>
+            <span style="font-size:12px; color:var(--fog); font-family:var(--font-mono);">${m.ago}</span>
+          </div>`).join("")}
+      </div>` : ""}
+    </div>` : ""}
+
+    ${lastBody? `
     <div class="card" data-open-custom="__profile__">
-      ${aboutLines.map((l,i)=>`<p style="margin:${i===0?'0':'6px'} 0 0; font-size:13.5px; color:${i===0?'var(--paper)':'var(--fog)'}; font-weight:${i===0?'600':'400'};">${esc(l)}</p>`).join("")}
+      <h2><span class="em">⚖️</span>Body</h2>
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${lastBody.weight||"—"}</div><div class="l">kg</div></div>
+        <div class="stat"><div class="n">${lastBody.height||"—"}</div><div class="l">cm</div></div>
+        <div class="stat"><div class="n">${(lastBody.weight&&lastBody.height)?(lastBody.weight/((lastBody.height/100)**2)).toFixed(1):"—"}</div><div class="l">BMI</div></div>
+      </div>
     </div>` : ""}
 
     ${updateAvailable? `
@@ -1082,9 +1143,22 @@ async function renderGrow(){
     </div>
     <div style="margin-bottom:14px;"><button class="btn ghost" data-new="habit">+ Add habit</button></div>
 
+    <div class="section-label">Long-term goals</div>
+    <div class="card">
+      ${goals.filter(g=>g.term==="Long-term" && g.status!=="Completed").length? goals.filter(g=>g.term==="Long-term" && g.status!=="Completed").map(g=>`
+        <div class="row" data-open="personalGoals|${g.id}">
+          <div class="row-icon">🏔️</div>
+          <div class="row-body"><div class="row-title">${esc(g.title)}</div>
+            <div class="row-sub">${g.targetDate?"Target "+fmtDate(g.targetDate):""}</div>
+            <div class="pbar"><div style="width:${Math.min(100,Number(g.progress)||0)}%; background:var(--gold);"></div></div>
+          </div>
+          <div class="row-amt">${Math.min(100,Number(g.progress)||0)}%</div>
+        </div>`).join("") : `<div class="empty"><span class="em">🏔️</span><p>No long-term goals yet — the big, multi-year stuff goes here.</p></div>`}
+    </div>
+
     <div class="section-label">Goals</div>
     <div class="card">
-      ${goals.length? goals.filter(g=>g.status!=="Completed").map(g=>`
+      ${goals.filter(g=>g.term!=="Long-term").length? goals.filter(g=>g.term!=="Long-term" && g.status!=="Completed").map(g=>`
         <div class="row" data-open="personalGoals|${g.id}">
           <div class="row-icon">🎯</div>
           <div class="row-body"><div class="row-title">${esc(g.title)}</div>
@@ -1127,16 +1201,20 @@ function openHabitForm(existing){
 /* =========================================================================
    MORE TAB — module tiles + settings/backup/search entry points
    ========================================================================= */
-function renderMore(){
+async function renderMore(){
   document.getElementById("topbar-title").textContent = "More";
   const el2 = document.getElementById("screen-more");
+  const profile = await DB.get("profile","main");
   el2.innerHTML = `
     <div class="section-label">About Me</div>
     <div class="tile-grid">
       <div class="tile" data-custom="__profile__"><div class="em">🧑</div><div class="l">Profile</div><div class="d">Birthday, education, hobbies, fears</div></div>
       <div class="tile" data-open="sleepLogs"><div class="em">😴</div><div class="l">Sleep</div></div>
+      <div class="tile" data-open="bodyLogs"><div class="em">⚖️</div><div class="l">Weight & height</div></div>
+      ${profile&&profile.sex==="Female"? `<div class="tile" data-open="cycleLogs"><div class="em">🌸</div><div class="l">Cycle log</div></div>`:""}
       <div class="tile" data-custom="__locations__"><div class="em">📍</div><div class="l">Location log</div></div>
       <div class="tile" data-custom="__photos__"><div class="em">🖼️</div><div class="l">Photos</div></div>
+      <div class="tile" data-open="relationships"><div class="em">💞</div><div class="l">Friends & relationships</div></div>
     </div>
     <div class="section-label">Track</div>
     <div class="tile-grid">
@@ -1653,6 +1731,7 @@ async function renderCalendarScreen(el2){
       <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px;">${cells}</div>
     </div>
     <button class="btn" id="cal-add">+ Add special date</button>
+    <button class="btn ghost" id="cal-all-time" style="margin-top:10px;">📜 See everything I've ever written</button>
     <div class="section-label">All activities in ${monthLabel}</div>
     <div class="card" id="cal-all"></div>
   `;
@@ -1660,6 +1739,7 @@ async function renderCalendarScreen(el2){
   el2.querySelector("#cal-prev").addEventListener("click", ()=>{ calCursor.setMonth(calCursor.getMonth()-1); renderCalendarScreen(el2); });
   el2.querySelector("#cal-next").addEventListener("click", ()=>{ calCursor.setMonth(calCursor.getMonth()+1); renderCalendarScreen(el2); });
   el2.querySelector("#cal-add").addEventListener("click", ()=> openImportantDateForm(null, todayStr(), el2));
+  el2.querySelector("#cal-all-time").addEventListener("click", ()=> openAllActivitiesEver(tasks, reminders, dates));
   el2.querySelectorAll("[data-day]").forEach(n=> n.addEventListener("click", ()=> openDayDetail(n.dataset.day, itemsOnDay(n.dataset.day), el2)));
 
   // Every activity across the currently displayed month, chronological.
@@ -1675,6 +1755,30 @@ async function renderCalendarScreen(el2){
     const [type, id] = n.dataset.item.split("|");
     if(type==="importantDates"){ const rec = await DB.get("importantDates", id); openImportantDateForm(rec, rec.date, el2); }
     else pushModule("form", type, id);
+  }));
+}
+function openAllActivitiesEver(tasks, reminders, dates){
+  const all = [];
+  tasks.forEach(t=> t.dueDate && all.push({icon:"📝", label:t.title, date:t.dueDate, type:"tasks", id:t.id}));
+  reminders.forEach(r=> r.dueDate && all.push({icon:"⏰", label:r.title, date:r.dueDate, type:"reminders", id:r.id}));
+  dates.forEach(d=> d.date && all.push({icon:"🎉", label:d.title, date:d.date, type:"importantDates", id:d.id}));
+  all.sort((a,b)=> b.date < a.date ? -1 : 1);
+  openSheet(`
+    <div class="sheet-title">Everything you've ever written</div>
+    <p class="field-hint" style="margin-top:0;">${all.length} item${all.length===1?'':'s'} across tasks, reminders, and special dates — most recent first.</p>
+    <div class="card" style="margin-top:8px;">
+      ${all.length? all.map(it=>`<div class="row" data-item="${it.type}|${it.id}"><div class="row-icon">${it.icon}</div><div class="row-body"><div class="row-title">${esc(it.label)}</div><div class="row-sub">${fmtDate(it.date)}</div></div></div>`).join("") : `<div class="empty"><p>Nothing yet.</p></div>`}
+    </div>
+  `);
+  document.querySelectorAll("[data-item]").forEach(n=> n.addEventListener("click", async ()=>{
+    const [type, id] = n.dataset.item.split("|");
+    closeSheet();
+    if(type==="importantDates"){
+      const rec = await DB.get("importantDates", id);
+      openImportantDateForm(rec, rec.date, document.getElementById("screen-module"));
+    } else {
+      pushModule("form", type, id);
+    }
   }));
 }
 function openDayDetail(dateStr, items, el2){
@@ -1772,6 +1876,12 @@ async function renderProfileScreen(el2){
     <div class="card">
       <h2><span class="em">🧑</span>About Me</h2>
       <label>Birthday</label><input id="pf-birthday" type="date" value="${p.birthday||''}">
+      <label>Sex</label>
+      <select id="pf-sex">
+        <option value="" ${!p.sex?'selected':''}>Prefer not to say</option>
+        <option value="Male" ${p.sex==='Male'?'selected':''}>Male</option>
+        <option value="Female" ${p.sex==='Female'?'selected':''}>Female</option>
+      </select>
       <label>Primary school</label><input id="pf-primary" value="${esc(p.primarySchool||'')}">
       <label>Primary school finish date</label><input id="pf-primary-date" type="date" value="${p.primaryFinishDate||''}">
       <label>High school</label><input id="pf-highschool" value="${esc(p.highSchool||'')}">
@@ -1781,6 +1891,21 @@ async function renderProfileScreen(el2){
       <label>Hobbies</label><textarea id="pf-hobbies" placeholder="One per line, or comma-separated">${esc(p.hobbies||'')}</textarea>
       <label>Fears</label><textarea id="pf-fears">${esc(p.fears||'')}</textarea>
       <p class="field-hint">Finish dates power the "you are..." and "...years ago" lines on your Home dashboard. Leave any blank to skip that line.</p>
+    </div>
+
+    ${p.sex==="Female"? `
+    <div class="section-label">Cycle tracking</div>
+    <div class="card">
+      <label style="margin-top:0;">Average cycle length (days)</label><input id="pf-cycle-len" type="number" value="${p.avgCycleLength||28}">
+      <p class="field-hint">Used to estimate your next period from your most recent logged one.</p>
+      <div id="pf-cycle-predict" style="margin:10px 0;"></div>
+      <button class="btn ghost sm" id="pf-cycle-open">Open cycle log</button>
+    </div>` : ""}
+
+    <div class="section-label">Body metrics</div>
+    <div class="card">
+      <div id="pf-body-latest"></div>
+      <button class="btn ghost sm" id="pf-body-log" style="margin-top:10px;">Log weight / height</button>
     </div>
 
     <div class="section-label">More about me</div>
@@ -1800,6 +1925,36 @@ async function renderProfileScreen(el2){
     </div>
   `;
   el2.querySelector("[data-back]").addEventListener("click", popModule);
+
+  if(p.sex==="Female"){
+    const lastCycle = (await DB.getAll("cycleLogs")).sort((a,b)=>(b.date||"")<(a.date||"")?-1:1)[0];
+    const predictEl = document.getElementById("pf-cycle-predict");
+    if(lastCycle){
+      const next = new Date(lastCycle.date+"T00:00:00");
+      next.setDate(next.getDate() + Number(p.avgCycleLength||28));
+      const nextStr = next.toISOString().slice(0,10);
+      const d = daysUntil(nextStr);
+      predictEl.innerHTML = `<p style="font-size:13px; color:var(--paper); margin:0;">Next period expected: <b>${fmtDate(nextStr)}</b>${d!=null?" ("+(d>=0?"in "+d+"d":Math.abs(d)+"d late")+")":""}</p>`;
+    } else {
+      predictEl.innerHTML = `<p style="font-size:12.5px; color:var(--fog); margin:0;">Log your first period to start predictions.</p>`;
+    }
+    document.getElementById("pf-cycle-open").addEventListener("click", ()=> pushModule("list","cycleLogs",null));
+  }
+
+  const lastBody = (await DB.getAll("bodyLogs")).sort((a,b)=>(b.date||"")<(a.date||"")?-1:1)[0];
+  const bodyEl = document.getElementById("pf-body-latest");
+  if(lastBody){
+    const bmi = (lastBody.weight && lastBody.height) ? (lastBody.weight/((lastBody.height/100)**2)).toFixed(1) : null;
+    bodyEl.innerHTML = `<div class="stat-grid">
+      <div class="stat"><div class="n">${lastBody.weight||"—"}</div><div class="l">kg</div></div>
+      <div class="stat"><div class="n">${lastBody.height||"—"}</div><div class="l">cm</div></div>
+      <div class="stat"><div class="n">${bmi||"—"}</div><div class="l">BMI</div></div>
+    </div><p class="field-hint" style="margin-top:8px;">As of ${fmtDate(lastBody.date)}</p>`;
+  } else {
+    bodyEl.innerHTML = `<p class="field-hint" style="margin:0;">No entries yet.</p>`;
+  }
+  document.getElementById("pf-body-log").addEventListener("click", ()=> pushModule("form","bodyLogs",null));
+
   el2.querySelector("#pf-add-fact").addEventListener("click", ()=>{
     p.customFacts.push({label:"", value:""});
     document.getElementById("pf-facts").innerHTML = factsHTML();
@@ -1817,6 +1972,8 @@ async function renderProfileScreen(el2){
   wireFactInputs();
   el2.querySelector("#pf-save").addEventListener("click", async ()=>{
     p.birthday = document.getElementById("pf-birthday").value;
+    p.sex = document.getElementById("pf-sex").value;
+    if(p.sex==="Female"){ const cl = document.getElementById("pf-cycle-len"); if(cl) p.avgCycleLength = Number(cl.value)||28; }
     p.primarySchool = document.getElementById("pf-primary").value;
     p.primaryFinishDate = document.getElementById("pf-primary-date").value;
     p.highSchool = document.getElementById("pf-highschool").value;
@@ -1835,6 +1992,7 @@ async function renderProfileScreen(el2){
         await DB.add("importantDates", {id:uid(), title:(SETTINGS.name||"My")+"'s birthday", date:p.birthday, category:"Birthday", recurring:"Yes", notes:"", createdAt:nowISO()});
       }
     }
+    renderProfileScreen(el2);
   });
 }
 
@@ -1885,6 +2043,7 @@ async function renderLocationsScreen(el2){
     <p class="field-hint" style="margin-top:0;">Only logged while Life OS is open on this device — there's no way for a web app to track location continuously in the background.</p>
     <div class="btn-row">
       <button class="btn" id="loc-now">📍 Log my location now</button>
+      <button class="btn ghost" id="loc-manual">✏️ Enter manually</button>
     </div>
     <div class="card" style="margin-top:14px;">
       <label style="margin-top:0;">Auto-log once per day when I open the app</label>
@@ -1896,15 +2055,46 @@ async function renderLocationsScreen(el2){
     <div class="section-label">History</div>
     <div class="card">
       ${logs.length? logs.map(l=>`
-        <div class="row"><div class="row-icon">📍</div><div class="row-body"><div class="row-title">${esc(l.label||"Unnamed place")}${l.auto?' <span style="color:var(--fog-dim); font-weight:400;">· auto</span>':''}</div><div class="row-sub">${fmtDate(l.date)} ${l.time||""} • ${l.lat.toFixed(4)}, ${l.lng.toFixed(4)}</div></div>
-        <a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener" style="color:var(--gold); font-size:12px; text-decoration:none;">Map</a></div>
+        <div class="row" data-id="${l.id}"><div class="row-icon">📍</div><div class="row-body"><div class="row-title">${esc(l.label||"Unnamed place")}${l.auto?' <span style="color:var(--fog-dim); font-weight:400;">· auto</span>':''}${l.manual?' <span style="color:var(--fog-dim); font-weight:400;">· manual</span>':''}</div><div class="row-sub">${fmtDate(l.date)} ${l.time||""}${(l.lat!=null)?" • "+l.lat.toFixed(4)+", "+l.lng.toFixed(4):""}</div></div>
+        ${(l.lat!=null)? `<a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener" style="color:var(--gold); font-size:12px; text-decoration:none; margin-right:10px;">Map</a>`:""}
+        <button class="btn danger sm loc-del" data-id="${l.id}" style="padding:6px 10px;">✕</button></div>
       `).join("") : `<div class="empty"><span class="em">📍</span><p>No locations logged yet.</p></div>`}
     </div>
   `;
   el2.querySelector("[data-back]").addEventListener("click", popModule);
   el2.querySelector("#loc-now").addEventListener("click", ()=> logLocationNow(el2));
+  el2.querySelector("#loc-manual").addEventListener("click", ()=> openManualLocationForm(el2));
   el2.querySelector("#loc-auto-on").addEventListener("click", async ()=>{ SETTINGS.autoLocationOn=true; await DB.put("settings",SETTINGS); renderLocationsScreen(el2); });
   el2.querySelector("#loc-auto-off").addEventListener("click", async ()=>{ SETTINGS.autoLocationOn=false; await DB.put("settings",SETTINGS); renderLocationsScreen(el2); });
+  el2.querySelectorAll(".loc-del").forEach(btn=> btn.addEventListener("click", async (e)=>{
+    e.stopPropagation();
+    if(!confirm("Delete this location entry?")) return;
+    await DB.delete("locationLogs", btn.dataset.id);
+    toast("Deleted"); renderLocationsScreen(el2);
+  }));
+}
+function openManualLocationForm(el2){
+  openSheet(`
+    <div class="sheet-title">Enter location manually</div>
+    <label>Place name / description</label><input id="ml-label" placeholder="e.g. Grandma's house, Nairobi CBD">
+    <label>Date</label><input id="ml-date" type="date" value="${todayStr()}">
+    <label>Coordinates (optional)</label>
+    <div style="display:flex; gap:8px;">
+      <input id="ml-lat" type="number" step="any" placeholder="Latitude">
+      <input id="ml-lng" type="number" step="any" placeholder="Longitude">
+    </div>
+    <button class="btn" id="ml-save" style="margin-top:14px;">Save location</button>
+  `);
+  document.getElementById("ml-save").addEventListener("click", async ()=>{
+    const label = document.getElementById("ml-label").value.trim();
+    if(!label){ toast("Enter a place name"); return; }
+    const lat = document.getElementById("ml-lat").value, lng = document.getElementById("ml-lng").value;
+    await DB.add("locationLogs", {
+      id:uid(), date:document.getElementById("ml-date").value||todayStr(), time:new Date().toTimeString().slice(0,5),
+      lat: lat!==""? Number(lat) : null, lng: lng!==""? Number(lng) : null, label, manual:true
+    });
+    closeSheet(); toast("Location saved"); renderLocationsScreen(el2);
+  });
 }
 
 /* =========================================================================
@@ -2011,7 +2201,9 @@ const QUICK_ACTIONS = [
   {em:"👤", l:"Contact", mod:"contacts"}, {em:"📄", l:"Document", mod:"document"},
   {em:"✈️", l:"Trip", mod:"trip"}, {em:"😊", l:"Mood", mod:"moods"},
   {em:"🙏", l:"Gratitude", mod:"gratitude"}, {em:"🏋️", l:"Workout", mod:"workouts"},
-  {em:"😴", l:"Sleep", mod:"sleepLogs"}, {em:"🎉", l:"Special date", mod:"importantDates"}
+  {em:"😴", l:"Sleep", mod:"sleepLogs"}, {em:"🎉", l:"Special date", mod:"importantDates"},
+  {em:"💞", l:"Relationship", mod:"relationships"}, {em:"⚖️", l:"Body log", mod:"bodyLogs"},
+  {em:"🖼️", l:"Photo", mod:"photo"}
 ];
 function openQuickAdd(){
   openSheet(`
@@ -2025,6 +2217,7 @@ function openQuickAdd(){
     if(n.dataset.mod==="habit"){ openHabitForm(); return; }
     if(n.dataset.mod==="document"){ openDocumentForm(); return; }
     if(n.dataset.mod==="trip"){ pushModule("form","trips",null); return; }
+    if(n.dataset.mod==="photo"){ pushModule("list","__photos__",null); return; }
     pushModule("form", n.dataset.mod, null);
   }));
 }
@@ -2345,14 +2538,21 @@ function openAboutSheet(){
     Your Personal Life OS. Fully offline, all data in IndexedDB on this device — no servers, no accounts, no tracking.
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Live now: Dashboard with life-balance ring, About Me (birthday, education timeline, hobbies, fears), Tasks, Reminders with repeat, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals, Habits with streaks, Journal, Mood, Gratitude, Sleep log, Reading tracker with streaks, Fitness log, Inventory, Contacts, local Document vault, Photos, Travel planner (itinerary + expenses), Places & bucket list, Calendar with full activity list, Life timeline, Location log, on-device app usage, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration, quick add, PIN + biometric lock, and full JSON backup/restore (built for moving to a new phone).
+    Live now: Dashboard with life-balance ring, age & education timeline, and body metrics, About Me (birthday, sex, education, hobbies, fears), Tasks, Reminders with repeat, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals (short & long-term), Habits with streaks, Journal, Mood, Gratitude, Sleep log, Cycle log, Body metrics, Reading tracker with streaks, Fitness log, Inventory, Contacts, Friends & relationships, local Document vault, Photos, Travel planner (itinerary + expenses), Places & bucket list, Calendar with a full activity history, Life timeline, Location log (auto + manual), on-device app usage, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration, quick add, PIN + biometric lock, and full JSON backup/restore (built for moving to a new phone).
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
     Still on the roadmap: Food & Entertainment trackers, a dedicated Learning tracker, richer personal analytics, and a formal Reports screen.
     </p>
+    <div style="border-top:1px solid var(--line); margin-top:16px; padding-top:14px;">
+      <h2 style="font-size:14px;"><span class="em">👨‍💻</span>Developer</h2>
+      <div class="kv"><span class="k">Name</span><span class="v">Darius Momanyi</span></div>
+      <div class="kv"><span class="k">Role</span><span class="v">Founder & Developer</span></div>
+      <div class="kv"><span class="k">Companies</span><span class="v">NovaDeskOnline · DMN Solutions</span></div>
+      <div class="kv"><span class="k">Based in</span><span class="v">Kenya</span></div>
+      <div class="kv"><span class="k">Site</span><span class="v"><a href="https://dmn-solution.vercel.app" target="_blank" rel="noopener" style="color:var(--gold); text-decoration:none;">dmn-solution.vercel.app</a></span></div>
+    </div>
     <div style="border-top:1px solid var(--line); margin-top:16px; padding-top:14px; text-align:center;">
       <p style="font-size:12px; color:var(--fog-dim); margin:0;">Version ${APP_VERSION}</p>
-      <p style="font-size:12.5px; color:var(--fog); margin:6px 0 0;">Built by Darius — <a href="https://dmn-solution.vercel.app" target="_blank" rel="noopener" style="color:var(--gold); text-decoration:none;">dmn-solution.vercel.app</a></p>
     </div>
   `);
 }

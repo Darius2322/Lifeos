@@ -296,14 +296,15 @@ nav.tabbar{
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.7.0";
 const DB_NAME = "lifeos";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
 // travel (trips/itinerary/expenses), places/bucket list, timeline, importantDates.
 // Phase 3 adds: sleep log, on-device app-usage log, location log.
 // Phase 4 adds: photos.
 // Phase 5 adds: relationships, menstrual cycle log, body metrics log.
+// Phase 6 adds: diet/food log, gym routine plans.
 // Bumping DB_VERSION triggers onupgradeneeded below, which only *adds* missing
 // stores — existing data from earlier phases is untouched.
 const STORES = [
@@ -346,7 +347,9 @@ const STORES = [
   {name:"photos", key:"id", indexes:["date"]},
   {name:"relationships", key:"id", indexes:["type"]},
   {name:"cycleLogs", key:"id", indexes:["date"]},
-  {name:"bodyLogs", key:"id", indexes:["date"]}
+  {name:"bodyLogs", key:"id", indexes:["date"]},
+  {name:"foodLogs", key:"id", indexes:["date","mealType"]},
+  {name:"gymRoutines", key:"id"}
 ];
 
 const DB = {
@@ -709,6 +712,28 @@ const MODULES = {
       {key:"notes", label:"Notes", type:"textarea"}
     ],
     title:r=>fmtDate(r.date), sub:r=> (r.weight?r.weight+"kg":"")+(r.height?" • "+r.height+"cm":"")
+  },
+  foodLogs: {
+    label:"Diet", icon:"🥗", color:"var(--sage)", store:"foodLogs",
+    fields:[
+      {key:"date", label:"Date", type:"date", required:true},
+      {key:"mealType", label:"Meal", type:"select", options:["Breakfast","Lunch","Dinner","Snack"]},
+      {key:"description", label:"What did you eat?", type:"text", required:true},
+      {key:"calories", label:"Calories (optional)", type:"number"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.description, sub:r=> (r.mealType||"Meal")+" • "+fmtDate(r.date)+(r.calories?" • "+r.calories+" cal":"")
+  },
+  gymRoutines: {
+    label:"Gym routines", icon:"💪", color:"var(--clay)", store:"gymRoutines",
+    fields:[
+      {key:"name", label:"Routine name", type:"text", required:true},
+      {key:"days", label:"Days", type:"select", options:["Mon/Wed/Fri","Tue/Thu/Sat","Every day","Weekends","Custom"]},
+      {key:"time", label:"Usual time", type:"time"},
+      {key:"exercises", label:"Exercises", type:"textarea"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.name, sub:r=> (r.days||"")+(r.time?" • "+r.time:"")
   }
 };
 
@@ -1249,8 +1274,10 @@ async function renderMore(){
     </div>
     <div class="section-label">Track</div>
     <div class="tile-grid">
+      <div class="tile" data-open="foodLogs"><div class="em">🥗</div><div class="l">Diet</div></div>
+      <div class="tile" data-open="gymRoutines"><div class="em">💪</div><div class="l">Gym routines</div></div>
+      <div class="tile" data-open="workouts"><div class="em">🏋️</div><div class="l">Fitness log</div></div>
       <div class="tile" data-open="books"><div class="em">📕</div><div class="l">Reading</div></div>
-      <div class="tile" data-open="workouts"><div class="em">🏋️</div><div class="l">Fitness</div></div>
       <div class="tile" data-open="inventory"><div class="em">🎒</div><div class="l">Inventory</div></div>
       <div class="tile" data-open="places"><div class="em">📍</div><div class="l">Places & bucket list</div></div>
     </div>
@@ -1279,6 +1306,7 @@ async function renderMore(){
       <div class="tile" data-action="backup"><div class="em">💾</div><div class="l">Backup & restore</div><div class="d">Export / import data</div></div>
       <div class="tile" data-action="settings"><div class="em">⚙️</div><div class="l">Settings</div><div class="d">Name, currency, PIN</div></div>
       <div class="tile" data-action="about"><div class="em">ℹ️</div><div class="l">About & roadmap</div></div>
+      <div class="tile" data-action="share"><div class="em">📤</div><div class="l">Share app</div><div class="d">Link + QR code</div></div>
       <div class="tile" data-action="terms"><div class="em">📃</div><div class="l">Terms & Conditions</div></div>
       <div class="tile" data-action="privacy"><div class="em">🛡️</div><div class="l">Privacy Policy</div></div>
     </div>
@@ -1291,10 +1319,41 @@ async function renderMore(){
   el2.querySelector('[data-action="backup"]').addEventListener("click", openBackupSheet);
   el2.querySelector('[data-action="settings"]').addEventListener("click", openSettingsSheet);
   el2.querySelector('[data-action="about"]').addEventListener("click", openAboutSheet);
+  el2.querySelector('[data-action="share"]').addEventListener("click", openShareSheet);
   el2.querySelector('[data-action="terms"]').addEventListener("click", openTermsSheet);
   el2.querySelector('[data-action="privacy"]').addEventListener("click", openPrivacySheet);
   el2.querySelector('[data-review="weekly"]').addEventListener("click", ()=>openReview("weekly"));
   el2.querySelector('[data-review="monthly"]').addEventListener("click", ()=>openReview("monthly"));
+}
+function openShareSheet(){
+  const url = location.href.split("#")[0];
+  openSheet(`
+    <div class="sheet-title">Share Life OS</div>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">Share this link with someone so they can install their own copy. Each install gets its own separate, private data — nothing here is shared between installs.</p>
+    <div class="card" style="background:var(--panel-2); margin:14px 0; word-break:break-all;">
+      <p style="font-size:12.5px; color:var(--paper); margin:0; font-family:var(--font-mono);">${esc(url)}</p>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="share-native">📤 Share link</button>
+      <button class="btn ghost" id="share-copy">Copy</button>
+    </div>
+    <div class="section-label">QR code</div>
+    <div class="card" style="text-align:center;">
+      <img id="share-qr" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}" style="width:220px; height:220px; background:#fff; border-radius:8px; padding:8px;" onerror="this.style.display='none'; document.getElementById('share-qr-fallback').style.display='block';">
+      <p id="share-qr-fallback" style="display:none; font-size:12px; color:var(--fog);">QR code needs an internet connection to generate — copy the link above instead.</p>
+      <p style="font-size:11px; color:var(--fog-dim); margin-top:10px;">Scan to open this same link on another phone.</p>
+    </div>
+  `);
+  document.getElementById("share-native").addEventListener("click", async ()=>{
+    if(navigator.share){
+      try{ await navigator.share({title:"Life OS", text:"A private, offline life management app — install your own copy:", url}); }catch(e){ /* user cancelled */ }
+    } else {
+      try{ await navigator.clipboard.writeText(url); toast("Link copied"); }catch(e){ toast("Couldn't copy — copy it manually above"); }
+    }
+  });
+  document.getElementById("share-copy").addEventListener("click", async ()=>{
+    try{ await navigator.clipboard.writeText(url); toast("Link copied"); }catch(e){ toast("Couldn't copy — select it manually"); }
+  });
 }
 
 /* =========================================================================
@@ -1379,6 +1438,8 @@ async function importContactsFromPhone(el2, modKey, cfg){
 
 async function renderModuleForm(el2, modKey, cfg, id){
   const existing = id? await DB.get(cfg.store, id) : null;
+  const hint = modKey==="gymRoutines" ? `<p class="field-hint">Saving this creates a weekly reminder automatically, based on the days you pick.</p>`
+    : modKey==="foodLogs" ? `<p class="field-hint">Tip: set a daily reminder (e.g. "Log lunch") from Quick Add so you don't forget to track meals.</p>` : "";
   el2.innerHTML = `
     <button class="detail-back" data-back>← Back</button>
     <div class="card">
@@ -1386,6 +1447,7 @@ async function renderModuleForm(el2, modKey, cfg, id){
       <form id="mform">
         ${cfg.fields.map(f=>fieldHTML(f, existing)).join("")}
       </form>
+      ${hint}
       <div class="btn-row">
         <button class="btn" id="mf-save">Save</button>
         ${existing? `<button class="btn danger" id="mf-del">Delete</button>`:""}
@@ -1395,6 +1457,7 @@ async function renderModuleForm(el2, modKey, cfg, id){
   el2.querySelector("[data-back]").addEventListener("click", popModule);
   el2.querySelector("#mf-save").addEventListener("click", async (e)=>{
     e.preventDefault();
+    const isNew = !existing;
     const rec = existing || {id:uid(), createdAt:nowISO()};
     let ok = true;
     cfg.fields.forEach(f=>{
@@ -1406,7 +1469,18 @@ async function renderModuleForm(el2, modKey, cfg, id){
     if(!ok){ toast("Please fill required fields"); return; }
     rec.updatedAt = nowISO();
     await DB.put(cfg.store, rec);
-    toast("Saved");
+    if(modKey==="gymRoutines" && isNew && rec.days){
+      const dayMap = {"Mon/Wed/Fri":["MO","WE","FR"], "Tue/Thu/Sat":["TU","TH","SA"], "Every day":["SU","MO","TU","WE","TH","FR","SA"], "Weekends":["SA","SU"]};
+      if(dayMap[rec.days]){
+        await DB.add("reminders", {
+          id:uid(), title:"Gym: "+rec.name, dueDate:todayStr(), time:rec.time||"", repeat:"Weekly",
+          notes:"Auto-created from your gym routine.", createdAt:nowISO()
+        });
+        toast("Saved — weekly reminder added too");
+      } else toast("Saved");
+    } else {
+      toast("Saved");
+    }
     popModule();
   });
   if(existing){
@@ -2260,7 +2334,7 @@ function openPhotoViewer(p, url, el2){
 let assistantMessages = [];
 async function renderAssistantScreen(el2){
   if(!assistantMessages.length){
-    assistantMessages.push({from:"bot", text:`Hey ${SETTINGS.name||"there"} 👋 I'm your Life OS assistant. I only know what's stored in this app — no internet, no general knowledge — so ask me things like "what's due today", "how much have I spent this month", "how are my goals going", or "when's my next period".`});
+    assistantMessages.push({from:"bot", text:`Hey ${SETTINGS.name||"there"} 👋 I'm your Life OS assistant. I only know what's stored in this app — no internet, no general knowledge — so ask me things like "what's due today", "how much have I spent this month", "how's my gym routine going", "what did I eat today", or "when's my next period".`});
   }
   el2.innerHTML = `
     <button class="detail-back" data-back>← Back</button>
@@ -2284,6 +2358,7 @@ async function renderAssistantScreen(el2){
     document.body.appendChild(bar);
   }
   bar.style.display = "flex";
+  document.getElementById("fab").style.display = "none";
   const input = document.getElementById("ax-input");
   const send = async ()=>{
     const q = input.value.trim();
@@ -2298,8 +2373,11 @@ async function renderAssistantScreen(el2){
   document.getElementById("ax-send").onclick = send;
   input.addEventListener("keydown", (e)=>{ if(e.key==="Enter") send(); });
 
-  // Clean up the floating bar when navigating away from this screen.
-  const cleanup = ()=>{ const b = document.getElementById("ax-inputbar"); if(b) b.style.display="none"; };
+  // Clean up the floating bar and restore the FAB when navigating away.
+  const cleanup = ()=>{
+    const b = document.getElementById("ax-inputbar"); if(b) b.style.display="none";
+    document.getElementById("fab").style.display = "flex";
+  };
   const observer = new MutationObserver(()=>{
     if(!document.getElementById("screen-module").classList.contains("active") || STATE.stack[STATE.stack.length-1]?.module!=="__assistant__"){
       cleanup(); observer.disconnect();
@@ -2424,7 +2502,43 @@ async function assistantRespond(qRaw){
     return parts.join(" — ") + ".";
   }
 
-  return `I can only answer from what's in your Life OS data — try asking about tasks, spending, goals, habits, sleep, weight, debts, subscriptions, reminders${name?", or your age":""}. Try something like "what's due today" or "how are my goals going".`;
+  if(/diet|meal|eat|calorie|nutrition/.test(q)){
+    const logs = await DB.getAll("foodLogs");
+    const todays = logs.filter(f=>f.date===today);
+    if(!logs.length) return "No meals logged yet — track one from Quick Add → Meal.";
+    if(!todays.length) return `No meals logged today yet. You've logged ${logs.length} meal${logs.length===1?"":"s"} in total.`;
+    const cal = todays.reduce((s,f)=>s+Number(f.calories||0),0);
+    return `Today so far: ${todays.map(f=>f.mealType+" — "+f.description).join("; ")}.${cal?" That's about "+cal+" calories.":""}`;
+  }
+
+  if(/gym|workout|exercise|routine|fitness/.test(q)){
+    const routines = await DB.getAll("gymRoutines");
+    const workouts = await DB.getAll("workouts");
+    const thisWeek = (()=>{ const d=new Date(); d.setDate(d.getDate()-7); return d.toISOString().slice(0,10); })();
+    const recent = workouts.filter(w=>w.date>=thisWeek);
+    if(!routines.length && !workouts.length) return "No gym routines or workouts logged yet — set up a routine from Quick Add → Gym routine.";
+    let parts = [];
+    if(routines.length) parts.push(`${routines.length} routine${routines.length===1?"":"s"} set up: ${routines.map(r=>r.name).join(", ")}`);
+    parts.push(`${recent.length} workout${recent.length===1?"":"s"} logged in the last 7 days`);
+    return parts.join(". ") + ".";
+  }
+
+  if(/document|expir/.test(q)){
+    const docs = await DB.getAll("documents");
+    const expiring = docs.filter(d=> d.expiryDate && daysUntil(d.expiryDate)!=null && daysUntil(d.expiryDate)>=0 && daysUntil(d.expiryDate)<=60);
+    if(!expiring.length) return "No documents expiring in the next 60 days.";
+    return "Expiring soon: " + expiring.map(d=>d.name+" ("+fmtDate(d.expiryDate)+")").join(", ") + ".";
+  }
+
+  if(/trip|travel/.test(q)){
+    const trips = await DB.getAll("trips");
+    const upcoming = trips.filter(t=> t.startDate && t.startDate>=today);
+    if(!trips.length) return "No trips planned yet.";
+    if(!upcoming.length) return `You have ${trips.length} trip${trips.length===1?"":"s"} logged, none upcoming.`;
+    return "Upcoming: " + upcoming.map(t=>t.name+(t.destination?" to "+t.destination:"")+" on "+fmtDate(t.startDate)).join(", ") + ".";
+  }
+
+  return `I can only answer from what's in your Life OS data — try asking about tasks, spending, goals, habits, sleep, weight, debts, subscriptions, reminders, diet, gym, documents, trips${name?", or your age":""}. Try something like "what's due today" or "how are my goals going".`;
 }
 
 /* =========================================================================
@@ -2442,7 +2556,8 @@ const QUICK_ACTIONS = [
   {em:"🙏", l:"Gratitude", mod:"gratitude"}, {em:"🏋️", l:"Workout", mod:"workouts"},
   {em:"😴", l:"Sleep", mod:"sleepLogs"}, {em:"🎉", l:"Special date", mod:"importantDates"},
   {em:"💞", l:"Relationship", mod:"relationships"}, {em:"⚖️", l:"Body log", mod:"bodyLogs"},
-  {em:"🖼️", l:"Photo", mod:"photo"}
+  {em:"🖼️", l:"Photo", mod:"photo"}, {em:"🥗", l:"Meal", mod:"foodLogs"},
+  {em:"💪", l:"Gym routine", mod:"gymRoutines"}
 ];
 function openQuickAdd(){
   openSheet(`
@@ -2592,6 +2707,10 @@ function openSettingsSheet(){
       ${SETTINGS.notificationsOn? `<button class="btn ghost sm" id="st-notif-test">🔔 Send test</button>`:""}
     </div>
     <p class="field-hint">Uses your phone's default notification sound and vibration. Fires while Life OS is open — this is a fully offline app, so background push isn't possible without a server. On iPhone, notifications only work if you've added Life OS to your Home Screen (Share → Add to Home Screen) — Safari tabs can't show them at all.</p>
+    <label>Developer contact (shown in About)</label>
+    <input id="st-dev-phone" value="${esc(SETTINGS.devPhone||'')}" placeholder="Phone number" type="tel">
+    <input id="st-dev-email" value="${esc(SETTINGS.devEmail||'')}" placeholder="Email" type="email" style="margin-top:8px;">
+    <p class="field-hint">Only shown to you in the About screen of this install — not sent anywhere.</p>
     <div style="margin-top:22px;">
       <button class="btn danger sm" id="st-wipe">Delete all data</button>
     </div>
@@ -2600,6 +2719,8 @@ function openSettingsSheet(){
   document.getElementById("st-save").onclick = async ()=>{
     SETTINGS.name = document.getElementById("st-name").value.trim();
     SETTINGS.currency = document.getElementById("st-currency").value.trim() || "KSh";
+    SETTINGS.devPhone = document.getElementById("st-dev-phone").value.trim();
+    SETTINGS.devEmail = document.getElementById("st-dev-email").value.trim();
     await DB.put("settings", SETTINGS);
     closeSheet(); toast("Settings saved"); setTab(STATE.tab);
   };
@@ -2783,10 +2904,10 @@ function openAboutSheet(){
     Your Personal Life OS. Fully offline, all data in IndexedDB on this device — no servers, no accounts, no tracking.
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Live now: Dashboard with life-balance ring, age & education timeline, and body metrics, profile photo, About Me (birthday, sex, education, hobbies, fears), a local AI-free "Assistant" that answers questions from your own data, first-run onboarding, Tasks, Reminders with repeat, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals (short & long-term), Habits with streaks, Journal, Mood, Gratitude, Sleep log, Cycle log, Body metrics, Reading tracker with streaks, Fitness log, Inventory, Contacts, Friends & relationships, local Document vault, Photos, Travel planner (itinerary + expenses), Places & bucket list, Calendar with a full activity history, Life timeline, Location log (auto + manual), on-device app usage, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration (with a test button), quick add, PIN + biometric lock, light/dark theme, and full JSON backup/restore (built for moving to a new phone).
+    Live now: Dashboard with life-balance ring, age & education timeline, and body metrics, profile photo, About Me (birthday, sex, education, hobbies, fears), a local AI-free "Assistant" that answers questions from your own data (now covering diet & gym too), first-run onboarding, Tasks, Reminders with repeat, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals (short & long-term), Habits with streaks, Journal, Mood, Gratitude, Sleep log, Cycle log, Body metrics, Diet log, Gym routines (with auto weekly reminders), Reading tracker with streaks, Fitness log, Inventory, Contacts, Friends & relationships, local Document vault, Photos, Travel planner (itinerary + expenses), Places & bucket list, Calendar with a full activity history, Life timeline, Location log (auto + manual), on-device app usage, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration (with a test button), Share app + QR code, quick add, PIN + biometric lock, light/dark theme, and full JSON backup/restore (built for moving to a new phone).
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Still on the roadmap: Food & Entertainment trackers, a dedicated Learning tracker, richer personal analytics, and a formal Reports screen.
+    Still on the roadmap: Entertainment tracker, a dedicated Learning tracker, richer personal analytics, and a formal Reports screen.
     </p>
     <div style="border-top:1px solid var(--line); margin-top:16px; padding-top:14px;">
       <h2 style="font-size:14px;"><span class="em">👨‍💻</span>Developer</h2>
@@ -2794,7 +2915,10 @@ function openAboutSheet(){
       <div class="kv"><span class="k">Role</span><span class="v">Founder & Developer</span></div>
       <div class="kv"><span class="k">Companies</span><span class="v">NovaDeskOnline · DMN Solutions</span></div>
       <div class="kv"><span class="k">Based in</span><span class="v">Kenya</span></div>
+      ${SETTINGS.devPhone? `<div class="kv"><span class="k">Phone</span><span class="v"><a href="tel:${esc(SETTINGS.devPhone)}" style="color:var(--gold); text-decoration:none;">${esc(SETTINGS.devPhone)}</a></span></div>`:""}
+      ${SETTINGS.devEmail? `<div class="kv"><span class="k">Email</span><span class="v"><a href="mailto:${esc(SETTINGS.devEmail)}" style="color:var(--gold); text-decoration:none;">${esc(SETTINGS.devEmail)}</a></span></div>`:""}
       <div class="kv"><span class="k">Site</span><span class="v"><a href="https://dmn-solution.vercel.app" target="_blank" rel="noopener" style="color:var(--gold); text-decoration:none;">dmn-solution.vercel.app</a></span></div>
+      ${!SETTINGS.devPhone&&!SETTINGS.devEmail? `<p class="field-hint" style="margin-top:10px;">Add your phone/email in Settings to show them here.</p>`:""}
     </div>
     <div style="border-top:1px solid var(--line); margin-top:16px; padding-top:14px; text-align:center;">
       <p style="font-size:12px; color:var(--fog-dim); margin:0;">Version ${APP_VERSION}</p>

@@ -125,6 +125,23 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--gold); outline-o
 textarea{min-height:80px; resize:vertical;}
 .field-hint{font-size:11px; color:var(--fog-dim); margin-top:4px;}
 
+/* ---------- Lively module forms (icons + staggered entrance) ---------- */
+.form-head{display:flex; align-items:center; gap:11px; margin-bottom:6px;}
+.form-head-icon{width:42px; height:42px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:20px; flex:none; box-shadow:0 3px 10px rgba(0,0,0,0.25);}
+.form-head h2{margin:0;}
+.field-row{opacity:0; animation:fieldIn .4s ease forwards; margin:18px 0;}
+.field-row:first-of-type{margin-top:14px;}
+@keyframes fieldIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
+.field-row-head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+.field-icon{display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:7px; background:var(--panel-2); font-size:12.5px; flex:none; transition:transform .15s ease;}
+.field-row:focus-within .field-icon{transform:scale(1.15); background:var(--gold); }
+.field-label-text{font-size:12px; color:var(--fog); font-weight:600;}
+.field-row.field-error input, .field-row.field-error select, .field-row.field-error textarea{border-color:var(--clay); animation:shakeErr .3s ease;}
+@keyframes shakeErr{0%,100%{transform:translateX(0);} 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);}}
+#mf-save{position:relative; overflow:hidden;}
+#mf-save::after{content:""; position:absolute; inset:0; background:linear-gradient(120deg, transparent, rgba(255,255,255,0.25), transparent); transform:translateX(-100%); animation:shine 2.6s ease-in-out infinite;}
+@keyframes shine{0%,60%{transform:translateX(-100%);} 100%{transform:translateX(100%);}}
+
 /* ---------- Bottom nav ---------- */
 nav.tabbar{
   position:fixed; bottom:0; left:0; right:0; z-index:30;
@@ -296,7 +313,35 @@ nav.tabbar{
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.8.0";
+const CHANGELOG = [
+  {version:"1.8.0", changes:[
+    "Redesigned forms — every field now has its own icon, with a smoother animated entrance",
+    "New: What's New screen — see exactly what changed after every update",
+    "New: optional online AI mode — the Assistant can use a real Claude model when you're online and add your own API key",
+    "Assistant can now take actions for you when online (e.g. add a task) — not just answer questions"
+  ]},
+  {version:"1.7.0", changes:[
+    "Fixed the + button covering Send on the Assistant screen",
+    "New: Share app — link + QR code so others can install their own copy",
+    "Assistant now understands diet, gym, documents, and trips questions",
+    "New: Diet log and Gym routines (saving a routine auto-creates a weekly reminder)",
+    "Developer phone/email are now editable in Settings and shown in About"
+  ]},
+  {version:"1.6.0", changes:[
+    "New: profile picture, shown on your Profile and Home greeting",
+    "Fixed a notification reliability bug + added a test-notification button",
+    "New: first-run onboarding for fresh installs",
+    "New: local Assistant (🤖) that answers questions from your own data",
+    "Visual polish: shadows, press animations, smoother transitions"
+  ]},
+  {version:"1.5.0", changes:[
+    "New: About Me profile with age & education timeline shown on Home",
+    "New: Sleep log, Cycle log, Body metrics, Location log, Photos, Friends & relationships",
+    "Calendar: tap any day to edit — including moving items to a new date",
+    "New: 'See everything I've ever written' full activity history"
+  ]}
+];
 const DB_NAME = "lifeos";
 const DB_VERSION = 6;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
@@ -1306,6 +1351,7 @@ async function renderMore(){
       <div class="tile" data-action="backup"><div class="em">💾</div><div class="l">Backup & restore</div><div class="d">Export / import data</div></div>
       <div class="tile" data-action="settings"><div class="em">⚙️</div><div class="l">Settings</div><div class="d">Name, currency, PIN</div></div>
       <div class="tile" data-action="about"><div class="em">ℹ️</div><div class="l">About & roadmap</div></div>
+      <div class="tile" data-action="whatsnew"><div class="em">✨</div><div class="l">What's new</div><div class="d">v${APP_VERSION}</div></div>
       <div class="tile" data-action="share"><div class="em">📤</div><div class="l">Share app</div><div class="d">Link + QR code</div></div>
       <div class="tile" data-action="terms"><div class="em">📃</div><div class="l">Terms & Conditions</div></div>
       <div class="tile" data-action="privacy"><div class="em">🛡️</div><div class="l">Privacy Policy</div></div>
@@ -1319,6 +1365,15 @@ async function renderMore(){
   el2.querySelector('[data-action="backup"]').addEventListener("click", openBackupSheet);
   el2.querySelector('[data-action="settings"]').addEventListener("click", openSettingsSheet);
   el2.querySelector('[data-action="about"]').addEventListener("click", openAboutSheet);
+  el2.querySelector('[data-action="whatsnew"]').addEventListener("click", ()=> openSheet(`
+    <div class="sheet-title">✨ What's new in ${APP_VERSION}</div>
+    ${CHANGELOG.map(c=>`
+      <div style="margin-top:14px;">
+        <div style="font-family:var(--font-mono); font-size:11px; color:var(--gold); font-weight:700; margin-bottom:6px;">v${c.version}</div>
+        ${c.changes.map(ch=>`<div style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:var(--sage);">✓</span><span style="font-size:13px; color:var(--paper); line-height:1.4;">${esc(ch)}</span></div>`).join("")}
+      </div>
+    `).join("")}
+  `));
   el2.querySelector('[data-action="share"]').addEventListener("click", openShareSheet);
   el2.querySelector('[data-action="terms"]').addEventListener("click", openTermsSheet);
   el2.querySelector('[data-action="privacy"]').addEventListener("click", openPrivacySheet);
@@ -1443,14 +1498,17 @@ async function renderModuleForm(el2, modKey, cfg, id){
   el2.innerHTML = `
     <button class="detail-back" data-back>← Back</button>
     <div class="card">
-      <h2>${existing? "Edit":"New"} ${cfg.label.replace(/s$/,'')}</h2>
+      <div class="form-head">
+        <div class="form-head-icon" style="background:${cfg.color};">${cfg.icon}</div>
+        <h2>${existing? "Edit":"New"} ${cfg.label.replace(/s$/,'')}</h2>
+      </div>
       <form id="mform">
-        ${cfg.fields.map(f=>fieldHTML(f, existing)).join("")}
+        ${cfg.fields.map((f,i)=>fieldHTML(f, existing, i)).join("")}
       </form>
       ${hint}
       <div class="btn-row">
-        <button class="btn" id="mf-save">Save</button>
-        ${existing? `<button class="btn danger" id="mf-del">Delete</button>`:""}
+        <button class="btn" id="mf-save">✓ Save</button>
+        ${existing? `<button class="btn danger" id="mf-del">🗑 Delete</button>`:""}
       </div>
     </div>
   `;
@@ -1463,7 +1521,7 @@ async function renderModuleForm(el2, modKey, cfg, id){
     cfg.fields.forEach(f=>{
       const node = document.getElementById("mf_"+f.key);
       const val = node.value;
-      if(f.required && !val){ ok=false; node.style.borderColor="var(--clay)"; }
+      if(f.required && !val){ ok=false; node.closest(".field-row").classList.add("field-error"); }
       rec[f.key] = f.type==="number"? (val===""? null: Number(val)) : val;
     });
     if(!ok){ toast("Please fill required fields"); return; }
@@ -1492,11 +1550,43 @@ async function renderModuleForm(el2, modKey, cfg, id){
     });
   }
 }
-function fieldHTML(f, existing){
+function fieldIcon(f){
+  const s = (f.key+" "+f.label).toLowerCase();
+  if(/date/.test(s)) return "📅";
+  if(/time/.test(s)) return "⏰";
+  if(/(amount|price|value|cost|budget|salary|payment|fee)/.test(s)) return "💰";
+  if(/(quantity|qty)/.test(s)) return "#️⃣";
+  if(/(location|place|destination|address)/.test(s)) return "📍";
+  if(/(condition|status|state)/.test(s)) return "✅";
+  if(/weight/.test(s)) return "⚖️";
+  if(/height/.test(s)) return "📏";
+  if(/(phone|tel)/.test(s)) return "📞";
+  if(/email/.test(s)) return "📧";
+  if(/(rating|quality|score)/.test(s)) return "⭐";
+  if(/(repeat|frequency|recur)/.test(s)) return "🔁";
+  if(/priority/.test(s)) return "🔥";
+  if(/(category|type|genre)/.test(s)) return "🏷️";
+  if(/(notes?|description|desc)/.test(s)) return "📝";
+  if(/(name|title)/.test(s)) return "✏️";
+  if(/calorie/.test(s)) return "🔥";
+  if(/day/.test(s)) return "📆";
+  if(f.type==="select") return "🏷️";
+  if(f.type==="date") return "📅";
+  if(f.type==="time") return "⏰";
+  if(f.type==="number") return "🔢";
+  if(f.type==="textarea") return "📝";
+  return "✏️";
+}
+function fieldHTML(f, existing, idx){
   const val = existing? (existing[f.key]!=null? existing[f.key]:"") : (f.type==="date"? todayStr() : "");
-  if(f.type==="textarea") return `<label>${f.label}</label><textarea id="mf_${f.key}">${esc(val)}</textarea>`;
-  if(f.type==="select") return `<label>${f.label}</label><select id="mf_${f.key}">${f.options.map(o=>`<option ${String(val)===o?'selected':''}>${esc(o)}</option>`).join("")}</select>`;
-  return `<label>${f.label}</label><input id="mf_${f.key}" type="${f.type}" value="${esc(val)}" ${f.type==='number'?'step="any"':''}>`;
+  const icon = fieldIcon(f);
+  const delay = ((idx||0)*0.045).toFixed(3);
+  const head = `<div class="field-row-head"><span class="field-icon">${icon}</span><span class="field-label-text">${esc(f.label)}</span></div>`;
+  let input;
+  if(f.type==="textarea") input = `<textarea id="mf_${f.key}">${esc(val)}</textarea>`;
+  else if(f.type==="select") input = `<select id="mf_${f.key}">${f.options.map(o=>`<option ${String(val)===o?'selected':''}>${esc(o)}</option>`).join("")}</select>`;
+  else input = `<input id="mf_${f.key}" type="${f.type}" value="${esc(val)}" ${f.type==='number'?'step="any"':''}>`;
+  return `<div class="field-row" style="animation-delay:${delay}s">${head}${input}</div>`;
 }
 
 async function renderModuleDetail(el2, modKey, cfg, id){
@@ -2334,7 +2424,8 @@ function openPhotoViewer(p, url, el2){
 let assistantMessages = [];
 async function renderAssistantScreen(el2){
   if(!assistantMessages.length){
-    assistantMessages.push({from:"bot", text:`Hey ${SETTINGS.name||"there"} 👋 I'm your Life OS assistant. I only know what's stored in this app — no internet, no general knowledge — so ask me things like "what's due today", "how much have I spent this month", "how's my gym routine going", "what did I eat today", or "when's my next period".`});
+    const onlineNote = (SETTINGS.aiOnline && SETTINGS.anthropicKey) ? (navigator.onLine? " 🟢 Real AI is on right now — I can also add tasks or reminders if you ask me to." : " 🟡 Real AI is enabled but you're offline, so I'm using local answers only for now.") : "";
+    assistantMessages.push({from:"bot", text:`Hey ${SETTINGS.name||"there"} 👋 I'm your Life OS assistant.${onlineNote} I only know what's stored in this app — no internet, no general knowledge unless online mode is on — so ask me things like "what's due today", "how much have I spent this month", "how's my gym routine going", "what did I eat today", or "when's my next period".`});
   }
   el2.innerHTML = `
     <button class="detail-back" data-back>← Back</button>
@@ -2395,6 +2486,69 @@ function renderAssistantMessages(){
   wrap.scrollIntoView({block:"end"});
 }
 async function assistantRespond(qRaw){
+  if(SETTINGS.aiOnline && SETTINGS.anthropicKey && navigator.onLine){
+    try{
+      const reply = await assistantRespondOnline(qRaw);
+      if(reply) return reply;
+    }catch(e){
+      console.error("Online AI failed, falling back to local:", e);
+      // Fall through to local — the app must never break because of the network.
+    }
+  }
+  return assistantRespondLocal(qRaw);
+}
+async function buildAssistantContext(){
+  const [tasks, reminders, goals, habits, expenses, profile, bodyLogs] = await Promise.all([
+    DB.getAll("tasks"), DB.getAll("reminders"), DB.getAll("personalGoals"),
+    DB.getAll("habits"), DB.getAll("expenses"), DB.get("profile","main"), DB.getAll("bodyLogs")
+  ]);
+  const today = todayStr();
+  const dueToday = tasks.filter(t=>!t.done && t.dueDate===today).map(t=>t.title);
+  const overdue = tasks.filter(t=>!t.done && t.dueDate && t.dueDate<today).length;
+  const monthPrefix = today.slice(0,7);
+  const spentThisMonth = expenses.filter(e=>(e.date||"").startsWith(monthPrefix)).reduce((s,e)=>s+Number(e.amount||0),0);
+  const activeGoals = goals.filter(g=>g.status!=="Completed").map(g=>g.title);
+  return `You are the Life OS Assistant for ${SETTINGS.name||"the user"}, a private offline-first personal management app. Today is ${today}.
+Their data right now: ${dueToday.length} tasks due today (${dueToday.join(", ")||"none"}), ${overdue} overdue tasks, ${activeGoals.length} active goals (${activeGoals.join(", ")||"none"}), spent ${SETTINGS.currency||"KSh"}${spentThisMonth} so far this month, ${habits.length} habits being tracked, ${reminders.length} reminders set.
+Answer naturally and briefly (2-4 sentences) using only this context — you have no other knowledge of their life beyond what's given here. Be warm but concise, like a helpful assistant, not a chatbot.
+If — and only if — the user is clearly asking you to add something, end your reply with exactly one action line in this exact format on its own line: [ACTION:add_task|Title|YYYY-MM-DD] or [ACTION:add_reminder|Title|YYYY-MM-DD]. Omit the date if none was given. Never invent an action the user didn't ask for.`;
+}
+async function assistantRespondOnline(qRaw){
+  const system = await buildAssistantContext();
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "x-api-key": SETTINGS.anthropicKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body: JSON.stringify({
+      model:"claude-sonnet-4-6",
+      max_tokens:400,
+      system,
+      messages:[{role:"user", content:qRaw}]
+    })
+  });
+  if(!res.ok) throw new Error("API error "+res.status);
+  const data = await res.json();
+  let text = (data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("").trim();
+  const actionMatch = text.match(/\[ACTION:(add_task|add_reminder)\|([^\|\]]+)(?:\|([^\]]+))?\]/);
+  if(actionMatch){
+    text = text.replace(actionMatch[0], "").trim();
+    await executeAssistantAction(actionMatch[1], actionMatch[2].trim(), (actionMatch[3]||"").trim());
+    text += (text? "\n\n":"") + "✓ Done — I've added that for you.";
+  }
+  return text || null;
+}
+async function executeAssistantAction(type, title, date){
+  if(type==="add_task"){
+    await DB.add("tasks", {id:uid(), title, dueDate:date||null, status:"open", done:false, createdAt:nowISO()});
+  } else if(type==="add_reminder"){
+    await DB.add("reminders", {id:uid(), title, dueDate:date||todayStr(), time:"", repeat:"", notes:"Added by the Assistant.", createdAt:nowISO()});
+  }
+}
+async function assistantRespondLocal(qRaw){
   const q = qRaw.toLowerCase();
   const name = SETTINGS.name || "";
   const today = todayStr();
@@ -2711,16 +2865,29 @@ function openSettingsSheet(){
     <input id="st-dev-phone" value="${esc(SETTINGS.devPhone||'')}" placeholder="Phone number" type="tel">
     <input id="st-dev-email" value="${esc(SETTINGS.devEmail||'')}" placeholder="Email" type="email" style="margin-top:8px;">
     <p class="field-hint">Only shown to you in the About screen of this install — not sent anywhere.</p>
+    <label>🤖 Online AI (optional)</label>
+    <div class="chips">
+      <span class="chip ${!SETTINGS.aiOnline?'active':''}" id="st-ai-off">Local only</span>
+      <span class="chip ${SETTINGS.aiOnline?'active':''}" id="st-ai-on">Real AI when online</span>
+    </div>
+    <div id="st-ai-key-wrap" style="${SETTINGS.aiOnline?'':'display:none;'} margin-top:10px;">
+      <input id="st-ai-key" type="password" value="${esc(SETTINGS.anthropicKey||'')}" placeholder="Your Anthropic API key (sk-ant-...)">
+      <p class="field-hint">⚠️ This app has no backend, so the key is stored on this device and sent <b>directly from your browser</b> to Anthropic when you ask the Assistant something while online. It's visible in your browser's network tab — use a key with a spending limit set, and never share this device's backup file with anyone you don't trust. When off, or when you're offline, the Assistant keeps working exactly as before using only your local data — nothing breaks either way. Get a key at console.anthropic.com.</p>
+    </div>
     <div style="margin-top:22px;">
       <button class="btn danger sm" id="st-wipe">Delete all data</button>
     </div>
     <button class="btn" id="st-save" style="margin-top:18px;">Save settings</button>
   `);
+  document.getElementById("st-ai-off").onclick = ()=>{ document.getElementById("st-ai-off").classList.add("active"); document.getElementById("st-ai-on").classList.remove("active"); document.getElementById("st-ai-key-wrap").style.display="none"; };
+  document.getElementById("st-ai-on").onclick = ()=>{ document.getElementById("st-ai-on").classList.add("active"); document.getElementById("st-ai-off").classList.remove("active"); document.getElementById("st-ai-key-wrap").style.display="block"; };
   document.getElementById("st-save").onclick = async ()=>{
     SETTINGS.name = document.getElementById("st-name").value.trim();
     SETTINGS.currency = document.getElementById("st-currency").value.trim() || "KSh";
     SETTINGS.devPhone = document.getElementById("st-dev-phone").value.trim();
     SETTINGS.devEmail = document.getElementById("st-dev-email").value.trim();
+    SETTINGS.aiOnline = document.getElementById("st-ai-on").classList.contains("active");
+    SETTINGS.anthropicKey = document.getElementById("st-ai-key").value.trim();
     await DB.put("settings", SETTINGS);
     closeSheet(); toast("Settings saved"); setTab(STATE.tab);
   };
@@ -3387,6 +3554,24 @@ function renderOnboardingStep(){
   }
 }
 
+function showWhatsNew(){
+  const seen = SETTINGS.lastSeenVersion;
+  const newEntries = seen ? CHANGELOG.filter(c=> c.version > seen) : [];
+  // First-run installs get onboarding instead of a changelog; only show this
+  // when someone is updating from a version they'd actually already used.
+  if(!seen || !newEntries.length) return;
+  openSheet(`
+    <div class="sheet-title">✨ What's new in ${APP_VERSION}</div>
+    ${newEntries.map(c=>`
+      <div style="margin-top:14px;">
+        <div style="font-family:var(--font-mono); font-size:11px; color:var(--gold); font-weight:700; margin-bottom:6px;">v${c.version}</div>
+        ${c.changes.map(ch=>`<div style="display:flex; gap:8px; margin-bottom:6px;"><span style="color:var(--sage);">✓</span><span style="font-size:13px; color:var(--paper); line-height:1.4;">${esc(ch)}</span></div>`).join("")}
+      </div>
+    `).join("")}
+    <button class="btn" id="wn-close" style="margin-top:18px;">Got it</button>
+  `);
+  document.getElementById("wn-close").addEventListener("click", closeSheet);
+}
 async function init(){
   await DB.open();
   await loadSettings();
@@ -3399,6 +3584,11 @@ async function init(){
   maybeAutoLogLocation();
   setTab("home");
   if(!SETTINGS.onboardingComplete) showOnboarding();
+  else if(SETTINGS.lastSeenVersion !== APP_VERSION){
+    setTimeout(showWhatsNew, 500);
+  }
+  SETTINGS.lastSeenVersion = APP_VERSION;
+  await DB.put("settings", SETTINGS);
 }
 init();
 

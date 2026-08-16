@@ -3351,14 +3351,17 @@ function openAboutSheet(){
     </div>
   `);
 }
-function openTermsSheet(){
-  openSheet(`
-    <div class="sheet-title">Terms & Conditions</div>
+function termsHTML(standalone){
+  const wrap = standalone ? (s)=>s : (s)=>`<div class="sheet-title">Terms & Conditions</div>${s}<a href="./terms.html" target="_blank" style="display:block; margin-top:14px; font-size:12px; color:var(--gold);">Open as a standalone page →</a>`;
+  return wrap(`
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
     Life OS is provided to you as-is, for personal, non-commercial use in organizing your own tasks, finances, goals, and personal records. There is no warranty, express or implied, that the app will be error-free, uninterrupted, or fit for any particular purpose.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
-    Because all data is stored only in this browser or app install, you are solely responsible for backing up your data (via the Backup & Restore screen). The developer is not responsible for data loss caused by clearing browser/site data, uninstalling the app, device failure, or browser storage limits.
+    Because all data is stored only in this browser or app install (except for the optional features described in the Privacy Policy), you are solely responsible for backing up your data (via the Backup & Restore screen). The developer is not responsible for data loss caused by clearing browser/site data, uninstalling the app, device failure, or browser storage limits.
+    </p>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    If you enable the optional online AI Assistant, Shared goals, or Google Drive backup, you are responsible for the account/API key you provide and any costs or terms associated with that third-party service (Anthropic, Supabase, Google) — Life OS itself does not charge for these or act as an intermediary.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
     Fitness, reading, and journaling features are for personal record-keeping only and do not constitute medical, financial, or legal advice. Consult a qualified professional for decisions in those areas.
@@ -3368,6 +3371,9 @@ function openTermsSheet(){
     </p>
     <p style="font-size:12px; color:var(--fog-dim); margin-top:14px;">Built by Darius — dmn-solution.vercel.app</p>
   `);
+}
+function openTermsSheet(){
+  openSheet(termsHTML(false));
 }
 function privacyPolicyHTML(standalone){
   const wrap = standalone ? (s)=>s : (s)=>`<div class="sheet-title">Privacy Policy</div>${s}<a href="./privacy.html" target="_blank" style="display:block; margin-top:14px; font-size:12px; color:var(--gold);">Open as a standalone page →</a>`;

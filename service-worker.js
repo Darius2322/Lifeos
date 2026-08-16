@@ -2,11 +2,12 @@
 // IMPORTANT: bump CACHE_VERSION on every deploy — the browser detects a new
 // service worker by comparing this file byte-for-byte, so an unchanged file
 // means updates never get picked up, no matter how much index.html changes.
-const CACHE_VERSION = 'lifeos-v1.16.0';
+const CACHE_VERSION = 'lifeos-v1.16.1';
 const CORE_ASSETS = [
   './',
   './index.html',
   './privacy.html',
+  './terms.html',
   './style.css',
   './db.js',
   './settings.js',

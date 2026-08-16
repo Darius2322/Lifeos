@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms & Conditions — Life OS</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body{background:var(--bg); color:var(--paper); font-family:var(--font-body,system-ui); padding:0;}
+  .doc-wrap{max-width:640px; margin:0 auto; padding:32px 20px 60px;}
+  .doc-wrap h1{font-family:var(--font-display); font-size:24px; margin:0 0 6px;}
+  .doc-wrap .sub{color:var(--fog-dim); font-size:12.5px; margin-bottom:28px;}
+  .doc-wrap a{color:var(--gold);}
+  .back-link{display:inline-block; margin-bottom:20px; color:var(--fog); font-size:13px; text-decoration:none;}
+</style>
+</head>
+<body>
+  <div class="doc-wrap">
+    <a href="./index.html" class="back-link">← Back to Life OS</a>
+    <h1>Terms & Conditions</h1>
+    <p class="sub">See also the <a href="./privacy.html">Privacy Policy</a>. Last updated alongside the app itself — see What's New in the app for the current version.</p>
+    <div id="terms-content"></div>
+  </div>
+  <script>
+    document.getElementById("terms-content").innerHTML = `
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    Life OS is provided to you as-is, for personal, non-commercial use in organizing your own tasks, finances, goals, and personal records. There is no warranty, express or implied, that the app will be error-free, uninterrupted, or fit for any particular purpose.
+    </p>
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    Because all data is stored only in this browser or app install (except for the optional features described in the Privacy Policy), you are solely responsible for backing up your data (via the Backup & Restore screen). The developer is not responsible for data loss caused by clearing browser/site data, uninstalling the app, device failure, or browser storage limits.
+    </p>
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    If you enable the optional online AI Assistant, Shared goals, or Google Drive backup, you are responsible for the account/API key you provide and any costs or terms associated with that third-party service (Anthropic, Supabase, Google) — Life OS itself does not charge for these or act as an intermediary.
+    </p>
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    Fitness, reading, and journaling features are for personal record-keeping only and do not constitute medical, financial, or legal advice. Consult a qualified professional for decisions in those areas.
+    </p>
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    You may not use this app to store or process data belonging to others without their consent, or in any way that violates applicable law. These terms may be updated as the app evolves; continued use after an update constitutes acceptance of the revised terms.
+    </p>
+    <p style="font-size:12px; color:var(--fog-dim); margin-top:20px;">Built by Darius — <a href="https://dmn-solution.vercel.app">dmn-solution.vercel.app</a></p>
+    `;
+  </script>
+</body>
+</html>

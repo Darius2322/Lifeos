@@ -2,8 +2,12 @@
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.16.0";
+const APP_VERSION = "1.16.1";
 const CHANGELOG = [
+  {version:"1.16.1", changes:[
+    "New: standalone terms.html page to match privacy.html, cross-linked to each other",
+    "Confirmed Plan and Grow are fully on the 2-column card grid — no leftover single-column lists"
+  ]},
   {version:"1.16.0", changes:[
     "Most emoji across the app are now real icons — tiles, list rows, form headers, empty states (a few dynamic spots like achievement badges are still emoji for now)",
     "Habits now show a 7-day completion trail; Plan tab shows a 'this week' progress bar",

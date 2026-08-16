@@ -71,12 +71,61 @@ const ICONS = {
   mountain:'<path d="m3 20 6-11 4 6 3-4 5 9z"/>',
   flame:'<path d="M12 22a6 6 0 0 0 6-6c0-3-2-4-3-6-.3 2-1.3 3-2 3-.7-2 0-4-1-7-3 2-6 6-6 10a6 6 0 0 0 6 6z"/>',
   sprout:'<path d="M12 22V12"/><path d="M12 12C7 12 5 9 5 5c4 0 7 2 7 7z"/><path d="M12 12c5 0 7-3 7-7-4 0-7 2-7 7z"/>',
-  trophy:'<path d="M8 4h8v4a4 4 0 0 1-8 0z"/><path d="M8 4H4v2a4 4 0 0 0 4 4M16 4h4v2a4 4 0 0 1-4 4"/><path d="M12 12v4M9 20h6M10 20v-4h4v4"/>'
+  trophy:'<path d="M8 4h8v4a4 4 0 0 1-8 0z"/><path d="M8 4H4v2a4 4 0 0 0 4 4M16 4h4v2a4 4 0 0 1-4 4"/><path d="M12 12v4M9 20h6M10 20v-4h4v4"/>',
+  wallet:'<path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v3"/><path d="M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1h-4a2 2 0 0 1 0-4h4a1 1 0 0 0 1-1"/><circle cx="16" cy="13" r=".6" fill="currentColor"/>',
+  heart:'<path d="M12 21s-7-4.5-9.5-9C.7 8.3 2.3 5 5.6 5c2 0 3.3 1.1 4.4 2.8C11.1 6.1 12.4 5 14.4 5c3.3 0 4.9 3.3 3.1 7-2.5 4.5-9.5 9-9.5 9z"/>',
+  smile:'<circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5s1.2 2 3.5 2 3.5-2 3.5-2M9 9.5h.01M15 9.5h.01"/>',
+  box:'<path d="M21 8 12 3 3 8l9 5 9-5z"/><path d="M3 8v9l9 5 9-5V8"/><path d="M12 13v9"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 5.5a3.5 3.5 0 0 1 0 7"/><path d="M22 20c0-2.8-1.8-5-4.5-5.7"/>',
+  book:'<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 19.5V4.5"/><path d="M20 19H6.5a2.5 2.5 0 0 0 0 5H20"/>',
+  activity:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>',
+  scale:'<path d="M12 3v18M5 7h14M5 7 2 15a3.5 3.5 0 0 0 7 0zM19 7l-3 8a3.5 3.5 0 0 0 7 0z"/>',
+  bowl:'<path d="M3 12h18a9 6 0 0 1-18 0z"/><path d="M12 3v3M8 4l1 3M16 4l-1 3"/>',
+  mapPin:'<path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  plane:'<path d="M10.5 21 12 17l1.5 4h-3z"/><path d="M12 3 3 10.5l4 1 2-1.5V15l2 1 2-1v-5l2 1.5 4-1z"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  link:'<path d="M9 15 15 9"/><path d="M11 6l1-1a4 4 0 0 1 5.7 5.7l-1 1"/><path d="M13 18l-1 1A4 4 0 0 1 6.3 13.3l1-1"/>',
+  home:'<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  gym:'<path d="M6.5 8v8M17.5 8v8"/><path d="M3 10.5h3M3 13.5h3M18 10.5h3M18 13.5h3"/><path d="M6.5 12h11"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
+  doc:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/>',
+  shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  share:'<circle cx="6" cy="12" r="2.3"/><circle cx="18" cy="6" r="2.3"/><circle cx="18" cy="18" r="2.3"/><path d="M8 10.8 16 6.8M8 13.2l8 4"/>',
+  image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M3 12h2.2M18.8 12H21M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5"/>',
+  sparkle:'<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
+  save:'<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h8V4M8 15h8v5"/>',
+  chevronLeft:'<path d="m14 6-6 6 6 6"/>',
+  chevronRight:'<path d="m10 6 6 6-6 6"/>'
 };
 function icon(name, size){
   size = size||18;
   const body = ICONS[name] || ICONS.target;
   return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle;">${body}</svg>`;
+}
+// Wraps every .tile-grid in the given container with left/right scroll buttons —
+// touch-scroll already works, but an explicit control makes it discoverable
+// for anyone using a mouse or who doesn't think to swipe sideways.
+function addScrollArrows(el2){
+  el2.querySelectorAll(".tile-grid").forEach(grid=>{
+    if(grid.dataset.arrowsAdded) return;
+    grid.dataset.arrowsAdded = "1";
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:relative;";
+    grid.parentNode.insertBefore(wrap, grid);
+    wrap.appendChild(grid);
+    ["left","right"].forEach(dir=>{
+      const b = document.createElement("button");
+      b.className = "scroll-arrow scroll-arrow-"+dir;
+      b.innerHTML = icon(dir==="left"?"chevronLeft":"chevronRight", 15);
+      b.setAttribute("aria-label", "Scroll "+dir);
+      b.addEventListener("click", ()=> grid.scrollBy({left: dir==="left"?-290:290, behavior:"smooth"}));
+      wrap.appendChild(b);
+    });
+  });
 }
 /* ---------- Sound cues (synthesized — no audio assets needed) ----------
    Distinct short tones for distinct moments, gated by SETTINGS.soundsOn. */
@@ -113,7 +162,7 @@ function el(html){ const t=document.createElement("template"); t.innerHTML=html.
    ========================================================================= */
 const MODULES = {
   tasks: {
-    label:"Tasks", icon:"📝", color:"var(--gold)", store:"tasks",
+    label:"Tasks", icon:"check", color:"var(--gold)", store:"tasks",
     fields:[
       {key:"title", label:"Task", type:"text", required:true},
       {key:"dueDate", label:"Due date", type:"date"},
@@ -124,7 +173,7 @@ const MODULES = {
     checkable:true
   },
   reminders: {
-    label:"Reminders", icon:"⏰", color:"var(--blue)", store:"reminders",
+    label:"Reminders", icon:"bell", color:"var(--blue)", store:"reminders",
     fields:[
       {key:"title", label:"Reminder", type:"text", required:true},
       {key:"dueDate", label:"Date", type:"date", required:true},
@@ -135,7 +184,7 @@ const MODULES = {
     title:r=>r.title, sub:r=> (r.dueDate? fmtDate(r.dueDate): "")+(r.time?" • "+r.time:"")+(r.repeat&&r.repeat!=="None"?" • "+r.repeat:""), checkable:true
   },
   notes: {
-    label:"Notes", icon:"📌", color:"var(--violet)", store:"notes",
+    label:"Notes", icon:"note", color:"var(--violet)", store:"notes",
     fields:[
       {key:"title", label:"Title", type:"text", required:true},
       {key:"body", label:"Note", type:"textarea"},
@@ -144,7 +193,7 @@ const MODULES = {
     title:r=>r.title, sub:r=> (r.body||"").slice(0,60)
   },
   expenses: {
-    label:"Expenses", icon:"💸", color:"var(--clay)", store:"expenses",
+    label:"Expenses", icon:"wallet", color:"var(--clay)", store:"expenses",
     fields:[
       {key:"description", label:"What was it for?", type:"text", required:true},
       {key:"amount", label:"Amount", type:"number", required:true},
@@ -156,7 +205,7 @@ const MODULES = {
     title:r=>r.description, sub:r=> r.category+" • "+fmtDate(r.date), amount:r=>-r.amount
   },
   income: {
-    label:"Income", icon:"💵", color:"var(--sage)", store:"income",
+    label:"Income", icon:"wallet", color:"var(--sage)", store:"income",
     fields:[
       {key:"description", label:"Source", type:"text", required:true},
       {key:"amount", label:"Amount", type:"number", required:true},
@@ -168,7 +217,7 @@ const MODULES = {
     title:r=>r.description, sub:r=> r.category+" • "+fmtDate(r.date), amount:r=>r.amount
   },
   debts: {
-    label:"Debts", icon:"🤝", color:"var(--clay)", store:"debts",
+    label:"Debts", icon:"wallet", color:"var(--clay)", store:"debts",
     fields:[
       {key:"person", label:"Person", type:"text", required:true},
       {key:"direction", label:"Direction", type:"select", options:["I owe them","They owe me"], required:true},
@@ -180,7 +229,7 @@ const MODULES = {
     title:r=>r.person, sub:r=>r.direction, amount:r=> (r.direction==="I owe them"? -1:1) * (r.remaining!=null? r.remaining : r.amount)
   },
   subscriptions: {
-    label:"Subscriptions", icon:"🔄", color:"var(--blue)", store:"subscriptions",
+    label:"Subscriptions", icon:"wallet", color:"var(--blue)", store:"subscriptions",
     fields:[
       {key:"name", label:"Name", type:"text", required:true},
       {key:"category", label:"Category", type:"select", options:["Streaming","Software","Internet","Gym","Insurance","Membership","Cloud storage","Other"]},
@@ -193,7 +242,7 @@ const MODULES = {
     title:r=>r.name, sub:r=> r.frequency+" • next "+(r.nextPaymentDate?fmtDate(r.nextPaymentDate):"—"), amount:r=>-r.amount
   },
   budgets: {
-    label:"Budgets", icon:"📊", color:"var(--sage)", store:"budgets",
+    label:"Budgets", icon:"wallet", color:"var(--sage)", store:"budgets",
     fields:[
       {key:"category", label:"Category", type:"select", options:["Food","Transport","Bills","Rent","Health","Shopping","Entertainment","Education","Other"], required:true},
       {key:"monthlyLimit", label:"Monthly limit", type:"number", required:true}
@@ -201,7 +250,7 @@ const MODULES = {
     title:r=>r.category, sub:r=> "Limit "+fmtMoney(r.monthlyLimit)+"/mo"
   },
   personalGoals: {
-    label:"Goals", icon:"🎯", color:"var(--gold)", store:"personalGoals",
+    label:"Goals", icon:"target", color:"var(--gold)", store:"personalGoals",
     fields:[
       {key:"title", label:"Goal", type:"text", required:true},
       {key:"term", label:"Term", type:"select", options:["Short-term","Long-term"]},
@@ -214,7 +263,7 @@ const MODULES = {
     title:r=>r.title, sub:r=> (r.term==="Long-term"?"🏔️ Long-term • ":"")+(r.category||"Goal")+" • "+(r.status||"Active")
   },
   journal: {
-    label:"Journal", icon:"📖", color:"var(--violet)", store:"journal",
+    label:"Journal", icon:"book", color:"var(--violet)", store:"journal",
     fields:[
       {key:"date", label:"Date", type:"date", required:true},
       {key:"title", label:"Title", type:"text"},
@@ -223,7 +272,7 @@ const MODULES = {
     title:r=>r.title||fmtDate(r.date), sub:r=>(r.content||"").slice(0,60)
   },
   gratitude: {
-    label:"Gratitude", icon:"🙏", color:"var(--sage)", store:"gratitude",
+    label:"Gratitude", icon:"heart", color:"var(--sage)", store:"gratitude",
     fields:[
       {key:"date", label:"Date", type:"date", required:true},
       {key:"item1", label:"Grateful for #1", type:"text"},
@@ -233,7 +282,7 @@ const MODULES = {
     title:r=>fmtDate(r.date), sub:r=>[r.item1,r.item2,r.item3].filter(Boolean).join(" · ")
   },
   moods: {
-    label:"Mood", icon:"😊", color:"var(--gold)", store:"moods",
+    label:"Mood", icon:"smile", color:"var(--gold)", store:"moods",
     fields:[
       {key:"date", label:"Date", type:"date", required:true},
       {key:"value", label:"Mood (1 low – 5 great)", type:"select", options:["1","2","3","4","5"], required:true},
@@ -242,7 +291,7 @@ const MODULES = {
     title:r=> "😊".repeat(0)+ "Mood "+r.value+"/5", sub:r=>fmtDate(r.date)+(r.note? " • "+r.note.slice(0,40):"")
   },
   inventory: {
-    label:"Inventory", icon:"🎒", color:"var(--blue)", store:"inventory",
+    label:"Inventory", icon:"box", color:"var(--blue)", store:"inventory",
     fields:[
       {key:"name", label:"Item name", type:"text", required:true},
       {key:"category", label:"Category", type:"select", options:["Electronics","Clothing","Furniture","Tools","Documents","Vehicles","Appliances","Books","Other"]},
@@ -259,7 +308,7 @@ const MODULES = {
     title:r=>r.name, sub:r=> (r.category||"Item")+(r.condition?" • "+r.condition:""), amount:r=>r.currentValue!=null?r.currentValue:r.purchasePrice
   },
   contacts: {
-    label:"Contacts", icon:"👤", color:"var(--violet)", store:"contacts",
+    label:"Contacts", icon:"user", color:"var(--violet)", store:"contacts",
     fields:[
       {key:"name", label:"Name", type:"text", required:true},
       {key:"category", label:"Relationship", type:"select", options:["Family","Friends","Work","School","Professional","Other"]},
@@ -272,7 +321,7 @@ const MODULES = {
     title:r=>r.name, sub:r=> (r.category||"Contact")+(r.phone?" • "+r.phone:"")
   },
   books: {
-    label:"Reading", icon:"📕", color:"var(--gold)", store:"books",
+    label:"Reading", icon:"book", color:"var(--gold)", store:"books",
     fields:[
       {key:"title", label:"Title", type:"text", required:true},
       {key:"author", label:"Author", type:"text"},
@@ -286,7 +335,7 @@ const MODULES = {
     title:r=>r.title, sub:r=> (r.author?r.author+" • ":"")+(r.status||"Want to read")
   },
   workouts: {
-    label:"Fitness", icon:"🏋️", color:"var(--clay)", store:"workouts",
+    label:"Fitness", icon:"activity", color:"var(--clay)", store:"workouts",
     fields:[
       {key:"category", label:"Type", type:"select", options:["Strength","Cardio","Running","Walking","Cycling","Sports","Home workout","Other"], required:true},
       {key:"date", label:"Date", type:"date", required:true},
@@ -300,7 +349,7 @@ const MODULES = {
     title:r=>r.category, sub:r=> fmtDate(r.date)+(r.duration?" • "+r.duration+" min":"")
   },
   places: {
-    label:"Places", icon:"📍", color:"var(--sage)", store:"places",
+    label:"Places", icon:"mapPin", color:"var(--sage)", store:"places",
     fields:[
       {key:"name", label:"Name", type:"text", required:true},
       {key:"category", label:"Category", type:"select", options:["Places to visit","Restaurants","Cities","Countries","Attractions","Events"]},
@@ -311,7 +360,7 @@ const MODULES = {
     title:r=>r.name, sub:r=> (r.category||"Place")+" • "+(r.status||"Want to visit")
   },
   trips: {
-    label:"Travel", icon:"✈️", color:"var(--blue)", store:"trips",
+    label:"Travel", icon:"plane", color:"var(--blue)", store:"trips",
     fields:[
       {key:"name", label:"Trip name", type:"text", required:true},
       {key:"destination", label:"Destination", type:"text"},
@@ -323,7 +372,7 @@ const MODULES = {
     title:r=>r.name, sub:r=> (r.destination?r.destination+" • ":"")+(r.startDate?fmtDate(r.startDate):""), amount:r=>r.budget
   },
   importantDates: {
-    label:"Special dates", icon:"🎉", color:"var(--violet)", store:"importantDates",
+    label:"Special dates", icon:"calendar", color:"var(--violet)", store:"importantDates",
     fields:[
       {key:"title", label:"Title", type:"text", required:true},
       {key:"date", label:"Date", type:"date", required:true},
@@ -334,7 +383,7 @@ const MODULES = {
     title:r=>r.title, sub:r=> fmtDate(r.date)+(r.recurring==="Yes"?" • yearly":"")
   },
   sleepLogs: {
-    label:"Sleep", icon:"😴", color:"var(--violet)", store:"sleepLogs",
+    label:"Sleep", icon:"moon", color:"var(--violet)", store:"sleepLogs",
     fields:[
       {key:"date", label:"Wake-up date", type:"date", required:true},
       {key:"bedTime", label:"Went to bed", type:"time"},
@@ -350,7 +399,7 @@ const MODULES = {
     }
   },
   relationships: {
-    label:"Friends & relationships", icon:"💞", color:"var(--violet)", store:"relationships",
+    label:"Friends & relationships", icon:"heart", color:"var(--violet)", store:"relationships",
     fields:[
       {key:"name", label:"Name", type:"text", required:true},
       {key:"type", label:"Type", type:"select", options:["Friend","Best Friend","Partner","Crush","Family","Ex","Other"]},
@@ -361,7 +410,7 @@ const MODULES = {
     title:r=>r.name, sub:r=> (r.type||"Friend")+(r.status?" • "+r.status:"")
   },
   cycleLogs: {
-    label:"Cycle log", icon:"🌸", color:"var(--clay)", store:"cycleLogs",
+    label:"Cycle log", icon:"heart", color:"var(--clay)", store:"cycleLogs",
     fields:[
       {key:"date", label:"Period start date", type:"date", required:true},
       {key:"periodLength", label:"Period length (days)", type:"number"},
@@ -372,7 +421,7 @@ const MODULES = {
     title:r=>fmtDate(r.date), sub:r=> (r.flow?r.flow+" flow":"")+(r.periodLength?" • "+r.periodLength+"d":"")
   },
   bodyLogs: {
-    label:"Body metrics", icon:"⚖️", color:"var(--sage)", store:"bodyLogs",
+    label:"Body metrics", icon:"scale", color:"var(--sage)", store:"bodyLogs",
     fields:[
       {key:"date", label:"Date", type:"date", required:true},
       {key:"weight", label:"Weight (kg)", type:"number"},
@@ -382,7 +431,7 @@ const MODULES = {
     title:r=>fmtDate(r.date), sub:r=> (r.weight?r.weight+"kg":"")+(r.height?" • "+r.height+"cm":"")
   },
   foodLogs: {
-    label:"Diet", icon:"🥗", color:"var(--sage)", store:"foodLogs",
+    label:"Diet", icon:"bowl", color:"var(--sage)", store:"foodLogs",
     fields:[
       {key:"date", label:"Date", type:"date", required:true},
       {key:"mealType", label:"Meal", type:"select", options:["Breakfast","Lunch","Dinner","Snack"]},
@@ -393,7 +442,7 @@ const MODULES = {
     title:r=>r.description, sub:r=> (r.mealType||"Meal")+" • "+fmtDate(r.date)+(r.calories?" • "+r.calories+" cal":"")
   },
   gymRoutines: {
-    label:"Gym routines", icon:"💪", color:"var(--clay)", store:"gymRoutines",
+    label:"Gym routines", icon:"gym", color:"var(--clay)", store:"gymRoutines",
     fields:[
       {key:"name", label:"Routine name", type:"text", required:true},
       {key:"days", label:"Days", type:"select", options:["Mon/Wed/Fri","Tue/Thu/Sat","Every day","Weekends","Custom"]},
@@ -404,7 +453,7 @@ const MODULES = {
     title:r=>r.name, sub:r=> (r.days||"")+(r.time?" • "+r.time:"")
   },
   householdMembers: {
-    label:"Household members", icon:"👪", color:"var(--sage)", store:"householdMembers",
+    label:"Household members", icon:"users", color:"var(--sage)", store:"householdMembers",
     fields:[
       {key:"name", label:"Name", type:"text", required:true},
       {key:"relation", label:"Relation", type:"select", options:["Spouse/Partner","Child","Parent","Other"]},
@@ -758,6 +807,10 @@ async function renderPlan(){
   const noDate = tasks.filter(t=>!t.done && !t.dueDate);
   const doneCount = tasks.filter(t=>t.done).length;
   const activeReminders = reminders.filter(r=>!r.done).sort((a,b)=>(a.dueDate||"")<(b.dueDate||"")?-1:1);
+  const weekStart = (()=>{ const d=new Date(); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); })();
+  const weekTasks = tasks.filter(t=>t.dueDate && t.dueDate>=weekStart);
+  const weekDone = weekTasks.filter(t=>t.done).length;
+  const weekPct = weekTasks.length? Math.round((weekDone/weekTasks.length)*100) : 0;
 
   function taskCard(t){
     const pClass = t.priority==="Top 3"?"top3":t.priority==="High"?"high":"";
@@ -788,6 +841,13 @@ async function renderPlan(){
       <div class="plan-hero-stat" data-open-list="reminders"><div class="n">${activeReminders.length}</div><div class="l">Reminders</div></div>
       <button class="plan-hero-cal" id="plan-cal-btn">${icon("calendar",18)}<span>Calendar</span></button>
     </div>
+    ${weekTasks.length? `<div class="card" style="padding:12px 14px; margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span style="font-size:12px; color:var(--fog); font-weight:600;">This week</span>
+        <span style="font-size:12px; color:var(--gold); font-weight:700;">${weekDone}/${weekTasks.length}</span>
+      </div>
+      <div style="height:6px; background:var(--panel-2); border-radius:4px; overflow:hidden;"><div style="height:100%; width:${weekPct}%; background:var(--gold); transition:width .4s ease;"></div></div>
+    </div>`:""}
 
     <div class="section-label">Reminders</div>
     <div class="card-grid">
@@ -885,11 +945,11 @@ async function renderMoney(){
 
     <div class="section-label">Manage</div>
     <div class="tile-grid">
-      <div class="tile" data-open="expenses"><div class="em">💸</div><div class="l">Expenses</div><div class="d">${expenses.length} logged</div></div>
-      <div class="tile" data-open="income"><div class="em">💵</div><div class="l">Income</div><div class="d">${income.length} logged</div></div>
-      <div class="tile" data-open="budgets"><div class="em">📊</div><div class="l">Budgets</div><div class="d">${budgets.length} set</div></div>
-      <div class="tile" data-open="debts"><div class="em">🤝</div><div class="l">Debts</div><div class="d">${debts.length} tracked</div></div>
-      <div class="tile" data-open="subscriptions"><div class="em">🔄</div><div class="l">Subscriptions</div><div class="d">${subs.length} active</div></div>
+      <div class="tile" data-open="expenses"><div class="em">${icon("wallet",22)}</div><div class="l">Expenses</div><div class="d">${expenses.length} logged</div></div>
+      <div class="tile" data-open="income"><div class="em">${icon("wallet",22)}</div><div class="l">Income</div><div class="d">${income.length} logged</div></div>
+      <div class="tile" data-open="budgets"><div class="em">${icon("wallet",22)}</div><div class="l">Budgets</div><div class="d">${budgets.length} set</div></div>
+      <div class="tile" data-open="debts"><div class="em">${icon("wallet",22)}</div><div class="l">Debts</div><div class="d">${debts.length} tracked</div></div>
+      <div class="tile" data-open="subscriptions"><div class="em">${icon("wallet",22)}</div><div class="l">Subscriptions</div><div class="d">${subs.length} active</div></div>
     </div>
   `;
   el2.querySelectorAll("[data-open]").forEach(n=>{
@@ -899,6 +959,7 @@ async function renderMoney(){
       n.addEventListener("click", ()=>pushModule("list", n.dataset.open, null));
     }
   });
+  addScrollArrows(el2);
 }
 
 /* =========================================================================
@@ -907,13 +968,18 @@ async function renderMoney(){
 async function renderGrow(){
   document.getElementById("topbar-title").textContent = "Grow";
   const el2 = document.getElementById("screen-grow");
-  const [goals, habits] = await Promise.all([DB.getAll("personalGoals"), DB.getAll("habits")]);
+  const [goals, habits, allCompletions] = await Promise.all([DB.getAll("personalGoals"), DB.getAll("habits"), DB.getAll("habitCompletions")]);
   const streaks = {};
   for(const h of habits) streaks[h.id] = await habitStreak(h.id);
   const doneToday = {};
-  const todaysComps = (await DB.getAll("habitCompletions")).filter(c=>c.date===todayStr());
+  const todaysComps = allCompletions.filter(c=>c.date===todayStr());
   todaysComps.forEach(c=> doneToday[c.habitId]=true);
   const completedGoals = goals.filter(g=>g.status==="Completed").length;
+  const last7 = Array.from({length:7}, (_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(6-i)); return d.toISOString().slice(0,10); });
+  function trail(habitId){
+    const doneDates = new Set(allCompletions.filter(c=>c.habitId===habitId).map(c=>c.date));
+    return `<div style="display:flex; gap:3px; margin-top:6px;">${last7.map(d=>`<div title="${d}" style="width:9px; height:9px; border-radius:3px; background:${doneDates.has(d)?'var(--sage)':'var(--panel-2)'};"></div>`).join("")}</div>`;
+  }
 
   function ring(pct, size){
     size = size||44;
@@ -946,6 +1012,7 @@ async function renderGrow(){
             ${streaks[h.id]>0? `<div class="streak-pill">${icon("flame",13)}${streaks[h.id]}</div>`:""}
           </div>
           <div class="gc-title">${esc(h.name)}</div><div class="gc-sub">${h.frequency||"Daily"}</div>
+          ${trail(h.id)}
         </div>`).join("") : `<div class="empty full-span">${icon("sprout",28)}<p>No habits yet. Add one to start a streak.</p></div>`}
     </div>
     <div style="margin:12px 0 14px;"><button class="btn ghost" data-new="habit">+ Add habit</button></div>
@@ -1005,54 +1072,59 @@ async function renderMore(){
   el2.innerHTML = `
     <div class="section-label">About Me</div>
     <div class="tile-grid">
-      <div class="tile" data-custom="__profile__"><div class="em">🧑</div><div class="l">Profile</div><div class="d">Birthday, sex, education, hobbies, fears</div></div>
-      <div class="tile" data-open="sleepLogs"><div class="em">😴</div><div class="l">Sleep</div></div>
-      <div class="tile" data-open="bodyLogs"><div class="em">⚖️</div><div class="l">Weight & height</div></div>
-      ${profile&&profile.sex==="Female"? `<div class="tile" data-open="cycleLogs"><div class="em">🌸</div><div class="l">Cycle log</div></div>`:""}
-      <div class="tile" data-custom="__locations__"><div class="em">📍</div><div class="l">Location log</div></div>
-      <div class="tile" data-custom="__photos__"><div class="em">🖼️</div><div class="l">Photos</div></div>
-      <div class="tile" data-open="relationships"><div class="em">💞</div><div class="l">Friends & relationships</div></div>
-      <div class="tile" data-custom="__household__"><div class="em">👪</div><div class="l">Household budget</div><div class="d">Wife, kids — spending by member</div></div>
-      <div class="tile" data-custom="__sharedgoals__"><div class="em">🔗</div><div class="l">Shared goals</div><div class="d">Save toward one goal together</div></div>
+      <div class="tile" data-custom="__profile__"><div class="em">${icon("user",22)}</div><div class="l">Profile</div><div class="d">Birthday, sex, education, hobbies, fears</div></div>
+      <div class="tile" data-open="sleepLogs"><div class="em">${icon("moon",22)}</div><div class="l">Sleep</div></div>
+      <div class="tile" data-open="bodyLogs"><div class="em">${icon("scale",22)}</div><div class="l">Weight & height</div></div>
+      ${profile&&profile.sex==="Female"? `<div class="tile" data-open="cycleLogs"><div class="em">${icon("heart",22)}</div><div class="l">Cycle log</div></div>`:""}
+      <div class="tile" data-custom="__locations__"><div class="em">${icon("mapPin",22)}</div><div class="l">Location log</div></div>
+      <div class="tile" data-custom="__photos__"><div class="em">${icon("image",22)}</div><div class="l">Photos</div></div>
+      <div class="tile" data-open="relationships"><div class="em">${icon("heart",22)}</div><div class="l">Friends & relationships</div></div>
+      <div class="tile" data-custom="__household__"><div class="em">${icon("users",22)}</div><div class="l">Household budget</div><div class="d">Wife, kids — spending by member</div></div>
+      <div class="tile" data-custom="__sharedgoals__"><div class="em">${icon("link",22)}</div><div class="l">Shared goals</div><div class="d">Save toward one goal together</div></div>
     </div>
     <div class="section-label">Track</div>
     <div class="tile-grid">
-      <div class="tile" data-open="foodLogs"><div class="em">🥗</div><div class="l">Diet</div></div>
-      <div class="tile" data-open="gymRoutines"><div class="em">💪</div><div class="l">Gym routines</div></div>
-      <div class="tile" data-open="workouts"><div class="em">🏋️</div><div class="l">Fitness log</div></div>
-      <div class="tile" data-open="books"><div class="em">📕</div><div class="l">Reading</div></div>
-      <div class="tile" data-open="inventory"><div class="em">🎒</div><div class="l">Inventory</div></div>
-      <div class="tile" data-open="places"><div class="em">📍</div><div class="l">Places & bucket list</div></div>
+      <div class="tile" data-open="foodLogs"><div class="em">${icon("bowl",22)}</div><div class="l">Diet</div></div>
+      <div class="tile" data-open="gymRoutines"><div class="em">${icon("gym",22)}</div><div class="l">Gym routines</div></div>
+      <div class="tile" data-open="workouts"><div class="em">${icon("activity",22)}</div><div class="l">Fitness log</div></div>
+      <div class="tile" data-open="books"><div class="em">${icon("book",22)}</div><div class="l">Reading</div></div>
+      <div class="tile" data-open="inventory"><div class="em">${icon("box",22)}</div><div class="l">Inventory</div></div>
+      <div class="tile" data-open="places"><div class="em">${icon("mapPin",22)}</div><div class="l">Places & bucket list</div></div>
     </div>
     <div class="section-label">Records</div>
     <div class="tile-grid">
-      <div class="tile" data-open="contacts"><div class="em">👤</div><div class="l">Contacts</div></div>
-      <div class="tile" data-custom="__documents__"><div class="em">📄</div><div class="l">Documents</div></div>
-      <div class="tile" data-open="trips"><div class="em">✈️</div><div class="l">Travel</div></div>
-      <div class="tile" data-custom="__timeline__"><div class="em">🕰️</div><div class="l">Life timeline</div></div>
+      <div class="tile" data-open="contacts"><div class="em">${icon("user",22)}</div><div class="l">Contacts</div></div>
+      <div class="tile" data-custom="__documents__"><div class="em">${icon("doc",22)}</div><div class="l">Documents</div></div>
+      <div class="tile" data-open="trips"><div class="em">${icon("plane",22)}</div><div class="l">Travel</div></div>
+      <div class="tile" data-custom="__timeline__"><div class="em">${icon("clock",22)}</div><div class="l">Life timeline</div></div>
     </div>
     <div class="section-label">Reflect</div>
     <div class="tile-grid">
-      <div class="tile" data-open="journal"><div class="em">📖</div><div class="l">Journal</div></div>
-      <div class="tile" data-open="moods"><div class="em">😊</div><div class="l">Mood</div></div>
-      <div class="tile" data-open="gratitude"><div class="em">🙏</div><div class="l">Gratitude</div></div>
-      <div class="tile" data-custom="__achievements__"><div class="em">🏆</div><div class="l">Achievements</div></div>
+      <div class="tile" data-open="journal"><div class="em">${icon("book",22)}</div><div class="l">Journal</div></div>
+      <div class="tile" data-open="moods"><div class="em">${icon("smile",22)}</div><div class="l">Mood</div></div>
+      <div class="tile" data-open="gratitude"><div class="em">${icon("heart",22)}</div><div class="l">Gratitude</div></div>
+      <div class="tile" data-custom="__achievements__"><div class="em">${icon("trophy",22)}</div><div class="l">Achievements</div></div>
     </div>
     <div class="section-label">Reviews</div>
     <div class="tile-grid">
-      <div class="tile" data-review="weekly"><div class="em">🗂️</div><div class="l">Weekly review</div></div>
-      <div class="tile" data-review="monthly"><div class="em">📆</div><div class="l">Monthly review</div></div>
+      <div class="tile" data-review="weekly"><div class="em">${icon("doc",22)}</div><div class="l">Weekly review</div></div>
+      <div class="tile" data-review="monthly"><div class="em">${icon("calendar",22)}</div><div class="l">Monthly review</div></div>
+    </div>
+    <div class="section-label">Connections</div>
+    <div class="tile-grid">
+      <div class="tile" data-action="gdrive-setup"><div class="em">${icon("save",22)}</div><div class="l">Google Drive setup</div><div class="d">Backup to your own Drive</div></div>
+      <div class="tile" data-action="supabase-setup"><div class="em">${icon("link",22)}</div><div class="l">Supabase setup</div><div class="d">For Shared goals</div></div>
     </div>
     <div class="section-label">System</div>
     <div class="tile-grid">
-      <div class="tile" data-action="search"><div class="em">🔍</div><div class="l">Search</div><div class="d">Across everything</div></div>
-      <div class="tile" data-action="backup"><div class="em">💾</div><div class="l">Backup & restore</div><div class="d">Export / import data</div></div>
-      <div class="tile" data-action="settings"><div class="em">⚙️</div><div class="l">Settings</div><div class="d">Name, currency, PIN</div></div>
-      <div class="tile" data-action="about"><div class="em">ℹ️</div><div class="l">About & roadmap</div></div>
-      <div class="tile" data-action="whatsnew"><div class="em">✨</div><div class="l">What's new</div><div class="d">v${APP_VERSION}</div></div>
-      <div class="tile" data-action="share"><div class="em">📤</div><div class="l">Share app</div><div class="d">Link + QR code</div></div>
-      <div class="tile" data-action="terms"><div class="em">📃</div><div class="l">Terms & Conditions</div></div>
-      <div class="tile" data-action="privacy"><div class="em">🛡️</div><div class="l">Privacy Policy</div></div>
+      <div class="tile" data-action="search"><div class="em">${icon("search",22)}</div><div class="l">Search</div><div class="d">Across everything</div></div>
+      <div class="tile" data-action="backup"><div class="em">${icon("save",22)}</div><div class="l">Backup & restore</div><div class="d">Export / import data</div></div>
+      <div class="tile" data-action="settings"><div class="em">${icon("gear",22)}</div><div class="l">Settings</div><div class="d">Name, currency, PIN</div></div>
+      <div class="tile" data-action="about"><div class="em">${icon("info",22)}</div><div class="l">About & roadmap</div></div>
+      <div class="tile" data-action="whatsnew"><div class="em">${icon("sparkle",22)}</div><div class="l">What's new</div><div class="d">v${APP_VERSION}</div></div>
+      <div class="tile" data-action="share"><div class="em">${icon("share",22)}</div><div class="l">Share app</div><div class="d">Link + QR code</div></div>
+      <div class="tile" data-action="terms"><div class="em">${icon("doc",22)}</div><div class="l">Terms & Conditions</div></div>
+      <div class="tile" data-action="privacy"><div class="em">${icon("shield",22)}</div><div class="l">Privacy Policy</div></div>
     </div>
     <p style="font-size:11.5px; color:var(--fog-dim); text-align:center; margin-top:24px;">Everything here lives only on this device.</p>
     <p style="font-size:11px; color:var(--fog-dim); text-align:center; margin-top:6px;">Built by Darius — <a href="https://dmn-solution.vercel.app" target="_blank" rel="noopener" style="color:var(--fog);">dmn-solution.vercel.app</a></p>
@@ -1062,6 +1134,8 @@ async function renderMore(){
   el2.querySelector('[data-action="search"]').addEventListener("click", openSearch);
   el2.querySelector('[data-action="backup"]').addEventListener("click", openBackupSheet);
   el2.querySelector('[data-action="settings"]').addEventListener("click", openSettingsSheet);
+  el2.querySelector('[data-action="gdrive-setup"]').addEventListener("click", ()=>{ openSettingsSheet(); toast("Scroll to '☁️ Google Drive backup'"); });
+  el2.querySelector('[data-action="supabase-setup"]').addEventListener("click", ()=>{ openSettingsSheet(); toast("Scroll to '🔗 Shared goals'"); });
   el2.querySelector('[data-action="about"]').addEventListener("click", openAboutSheet);
   el2.querySelector('[data-action="whatsnew"]').addEventListener("click", ()=> openSheet(`
     <div class="sheet-title">✨ What's new in ${APP_VERSION}</div>
@@ -1077,6 +1151,7 @@ async function renderMore(){
   el2.querySelector('[data-action="privacy"]').addEventListener("click", openPrivacySheet);
   el2.querySelector('[data-review="weekly"]').addEventListener("click", ()=>openReview("weekly"));
   el2.querySelector('[data-review="monthly"]').addEventListener("click", ()=>openReview("monthly"));
+  addScrollArrows(el2);
 }
 function openShareSheet(){
   const url = location.href.split("#")[0];
@@ -1473,10 +1548,10 @@ async function renderModuleList(el2, modKey, cfg){
     <div class="card">
       ${records.length? records.map(r=>`
         <div class="row" data-id="${r.id}">
-          <div class="row-icon">${cfg.icon}</div>
+          <div class="row-icon">${icon(cfg.icon,16)}</div>
           <div class="row-body"><div class="row-title" style="${r.done?'text-decoration:line-through; opacity:0.6;':''}">${esc(cfg.title(r))}</div><div class="row-sub">${esc(cfg.sub? cfg.sub(r):"")}</div></div>
           ${cfg.amount? `<div class="row-amt" style="color:${cfg.amount(r)<0?'var(--clay)':'var(--sage)'}">${fmtMoney(cfg.amount(r))}</div>`:""}
-        </div>`).join("") : `<div class="empty"><span class="em">${cfg.icon}</span><p>No ${cfg.label.toLowerCase()} ${modKey==="tasks"&&TASK_LIST_STATE.filter!=="all"?"matching this filter":"yet"}.</p></div>`}
+        </div>`).join("") : `<div class="empty">${icon(cfg.icon,26)}<p>No ${cfg.label.toLowerCase()} ${modKey==="tasks"&&TASK_LIST_STATE.filter!=="all"?"matching this filter":"yet"}.</p></div>`}
     </div>
     <div class="btn-row">
       <button class="btn" id="ml-add">+ Add ${cfg.label.toLowerCase().replace(/s$/,'')}</button>
@@ -1547,7 +1622,7 @@ async function renderModuleForm(el2, modKey, cfg, id){
     <button class="detail-back" data-back>← Back</button>
     <div class="card">
       <div class="form-head">
-        <div class="form-head-icon" style="background:${cfg.color};">${cfg.icon}</div>
+        <div class="form-head-icon" style="background:${cfg.color};">${icon(cfg.icon,20)}</div>
         <h2>${existing? "Edit":"New"} ${cfg.label.replace(/s$/,'')}</h2>
       </div>
       <form id="mform">
@@ -1718,7 +1793,7 @@ async function renderModuleDetail(el2, modKey, cfg, id){
   el2.innerHTML = `
     <button class="detail-back" data-back>← Back</button>
     <div class="card">
-      <h2>${cfg.icon} ${esc(cfg.title(r))}</h2>
+      <h2 style="display:flex; align-items:center; gap:8px;">${icon(cfg.icon,18)} ${esc(cfg.title(r))}</h2>
       ${cfg.fields.map(f=> r[f.key]!=null && r[f.key]!=="" ? `<div class="kv"><span class="k">${f.label}</span><span class="v">${f.type==='number'?fmtMoney(r[f.key]).replace(SETTINGS.currency+" ",""):esc(r[f.key])}</span></div>`:"").join("")}
     </div>
     <div class="btn-row">
@@ -2989,7 +3064,7 @@ async function runSearch(q){
     const hits = all.filter(r=> JSON.stringify(r,(k,v)=> k==='blob'?undefined:v).toLowerCase().includes(needle));
     if(hits.length){
       html += `<div class="section-label">${cfg.label} — ${hits.length}</div><div class="card">`;
-      html += hits.slice(0,10).map(r=>`<div class="row" data-open="${key}|${r.id}"><div class="row-icon">${cfg.icon}</div><div class="row-body"><div class="row-title">${esc(cfg.title(r))}</div><div class="row-sub">${esc(cfg.sub?cfg.sub(r):"")}</div></div></div>`).join("");
+      html += hits.slice(0,10).map(r=>`<div class="row" data-open="${key}|${r.id}"><div class="row-icon">${icon(cfg.icon,16)}</div><div class="row-body"><div class="row-title">${esc(cfg.title(r))}</div><div class="row-sub">${esc(cfg.sub?cfg.sub(r):"")}</div></div></div>`).join("");
       html += `</div>`;
     }
   }
@@ -3294,26 +3369,32 @@ function openTermsSheet(){
     <p style="font-size:12px; color:var(--fog-dim); margin-top:14px;">Built by Darius — dmn-solution.vercel.app</p>
   `);
 }
-function openPrivacySheet(){
-  openSheet(`
-    <div class="sheet-title">Privacy Policy</div>
+function privacyPolicyHTML(standalone){
+  const wrap = standalone ? (s)=>s : (s)=>`<div class="sheet-title">Privacy Policy</div>${s}<a href="./privacy.html" target="_blank" style="display:block; margin-top:14px; font-size:12px; color:var(--gold);">Open as a standalone page →</a>`;
+  return wrap(`
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
-    Life OS is a local-first, offline application. All the data you enter — tasks, finances, journal entries, documents, contacts, and everything else — is stored only in this device's browser storage (IndexedDB), never transmitted to any server.
+    Life OS is local-first: everything you enter — tasks, finances, journal entries, documents, contacts, and everything else — is stored only in this device's browser storage (IndexedDB). Nothing is transmitted anywhere by default.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
-    <b style="color:var(--paper);">What we don't do:</b> no account creation, no analytics, no advertising SDKs, no tracking scripts, no third-party data sharing. There is no backend for this app to send your data to — Anthropic/Claude, Vercel, and any hosting provider serving these static files never see your entered data; they only serve the app's code and assets.
+    <b style="color:var(--paper);">By default:</b> no account creation, no analytics, no advertising SDKs, no tracking scripts. There is no backend — Vercel or any host serving these static files only serves the app's code, never your data.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
-    <b style="color:var(--paper);">Device features:</b> if you enable notifications, fingerprint/Face ID unlock, or contact import, those use your browser's built-in APIs (Notifications, WebAuthn, Contact Picker) directly — no data from these passes through any server either. Contact import requires your explicit selection of each contact via your phone's native picker.
+    <b style="color:var(--paper);">Optional features that do send data, only if you turn them on:</b> the online AI Assistant (your question and a summary of your data go directly to Anthropic's API using your own API key); Shared goals (goal progress and, only if you opt in, your name/photo/birthday go to your own Supabase project); Google Drive backup (your backup file goes to your own Google Drive, using your own Google account). Each is off unless you explicitly configure it in Settings, and each sends data only to a service you control the credentials for — never to us.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
-    <b style="color:var(--paper);">Backups:</b> when you export a backup, a JSON file is generated on your device and saved wherever you choose (downloads, a cloud drive you control, etc.) — this is entirely under your control and control of the destination's own privacy practices.
+    <b style="color:var(--paper);">Device features:</b> notifications, fingerprint/Face ID unlock, and contact import use your browser's built-in APIs directly — no server involved. Contact import requires your explicit selection of each contact via your phone's native picker.
+    </p>
+    <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
+    <b style="color:var(--paper);">Backups:</b> a manually exported backup is a JSON file saved wherever you choose — entirely under your control.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
     Clearing your browser's site data, or uninstalling the app, permanently deletes this data with no way to recover it unless you've made a backup.
     </p>
     <p style="font-size:12px; color:var(--fog-dim); margin-top:14px;">Built by Darius — dmn-solution.vercel.app</p>
   `);
+}
+function openPrivacySheet(){
+  openSheet(privacyPolicyHTML(false));
 }
 
 /* =========================================================================

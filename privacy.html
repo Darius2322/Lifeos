@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Life OS</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body{background:var(--bg); color:var(--paper); font-family:var(--font-body,system-ui); padding:0;}
+  .doc-wrap{max-width:640px; margin:0 auto; padding:32px 20px 60px;}
+  .doc-wrap h1{font-family:var(--font-display); font-size:24px; margin:0 0 6px;}
+  .doc-wrap .sub{color:var(--fog-dim); font-size:12.5px; margin-bottom:28px;}
+  .doc-wrap a{color:var(--gold);}
+  .back-link{display:inline-block; margin-bottom:20px; color:var(--fog); font-size:13px; text-decoration:none;}
+</style>
+</head>
+<body>
+  <div class="doc-wrap">
+    <a href="./index.html" class="back-link">← Back to Life OS</a>
+    <h1>Privacy Policy</h1>
+    <p class="sub">Last updated alongside the app itself — see What's New in the app for the current version.</p>
+    <div id="privacy-content"></div>
+  </div>
+  <script src="db.js"></script>
+  <script>
+    // Reuses the same copy shown in-app (see privacyPolicyHTML in app.js) so this
+    // page can never drift out of sync with what the app itself tells the user.
+  </script>
+  <script>
+    document.getElementById("privacy-content").innerHTML = `
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    Life OS is local-first: everything you enter — tasks, finances, journal entries, documents, contacts, and everything else — is stored only in this device's browser storage (IndexedDB). Nothing is transmitted anywhere by default.
+    </p>
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    <b style="color:var(--paper);">By default:</b> no account creation, no analytics, no advertising SDKs, no tracking scripts. There is no backend — Vercel or any host serving these static files only serves the app's code, never your data.
+    </p>
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    <b style="color:var(--paper);">Optional features that do send data, only if you turn them on:</b> the online AI Assistant (your question and a summary of your data go directly to Anthropic's API using your own API key); Shared goals (goal progress and, only if you opt in, your name/photo/birthday go to your own Supabase project); Google Drive backup (your backup file goes to your own Google Drive, using your own Google account). Each is off unless you explicitly configure it in Settings, and each sends data only to a service you control the credentials for — never to us.
+    </p>
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    <b style="color:var(--paper);">Device features:</b> notifications, fingerprint/Face ID unlock, and contact import use your browser's built-in APIs directly — no server involved. Contact import requires your explicit selection of each contact via your phone's native picker.
+    </p>
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    <b style="color:var(--paper);">Backups:</b> a manually exported backup is a JSON file saved wherever you choose — entirely under your control.
+    </p>
+    <p style="font-size:13.5px; color:var(--fog); line-height:1.7;">
+    Clearing your browser's site data, or uninstalling the app, permanently deletes this data with no way to recover it unless you've made a backup.
+    </p>
+    <p style="font-size:12px; color:var(--fog-dim); margin-top:20px;">Built by Darius — <a href="https://dmn-solution.vercel.app">dmn-solution.vercel.app</a></p>
+    `;
+  </script>
+</body>
+</html>

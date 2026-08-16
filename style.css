@@ -210,6 +210,10 @@ nav.tabbar{
 
 /* ---------- Module tiles (More screen) ---------- */
 .tile-grid{display:grid; grid-template-rows:repeat(2,1fr); grid-auto-flow:column; grid-auto-columns:138px; gap:10px; overflow-x:auto; scroll-snap-type:x proximity; padding-bottom:6px; -webkit-overflow-scrolling:touch; scrollbar-width:none; -webkit-mask-image:linear-gradient(to right, black 94%, transparent 100%); mask-image:linear-gradient(to right, black 94%, transparent 100%);}
+.scroll-arrow{position:absolute; top:50%; transform:translateY(-50%); width:26px; height:26px; border-radius:50%; background:var(--panel); border:1px solid var(--line); color:var(--paper); display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; box-shadow:0 2px 6px rgba(0,0,0,0.3); opacity:0.9;}
+.scroll-arrow-left{left:-4px;}
+.scroll-arrow-right{right:-4px;}
+.scroll-arrow:active{transform:translateY(-50%) scale(0.88);}
 .tile-grid::-webkit-scrollbar{display:none;}
 .tile{background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg); padding:14px; cursor:pointer; scroll-snap-align:start; display:flex; flex-direction:column; justify-content:flex-start; min-height:92px;}
 .tile .em{font-size:22px;}

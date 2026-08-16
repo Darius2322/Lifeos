@@ -2,8 +2,16 @@
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.15.0";
+const APP_VERSION = "1.16.0";
 const CHANGELOG = [
+  {version:"1.16.0", changes:[
+    "Most emoji across the app are now real icons — tiles, list rows, form headers, empty states (a few dynamic spots like achievement badges are still emoji for now)",
+    "Habits now show a 7-day completion trail; Plan tab shows a 'this week' progress bar",
+    "More screen tile sections now have explicit scroll arrows, not just swipe",
+    "New: Google Drive setup and Supabase setup shortcuts in More → Connections",
+    "New: standalone privacy.html page (in addition to the in-app Privacy Policy), updated to cover the AI/Supabase/Google Drive features honestly",
+    "Privacy Policy text updated — it previously said 'no backend' which is no longer fully true now that online AI, Shared goals, and Drive backup exist as opt-in features"
+  ]},
   {version:"1.15.0", changes:[
     "Plan and Grow tabs now use a proper 2-column card grid that scrolls vertically, instead of a single stacked list",
     "Under the hood: the app is now split into separate files (style.css, db.js, settings.js, app.js) instead of one giant file — same offline reliability, easier to maintain and extend going forward"

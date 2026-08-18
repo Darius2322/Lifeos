@@ -205,7 +205,7 @@ nav.tabbar{
 /* ---------- Quick add grid ---------- */
 .qa-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px;}
 .qa-item{background:var(--panel-2); border:1px solid var(--line); border-radius:var(--r-md); padding:14px 6px; text-align:center; cursor:pointer;}
-.qa-item .em{font-size:22px; display:block; margin-bottom:6px;}
+.qa-item .em{display:flex; justify-content:center; margin-bottom:6px;}
 .qa-item .l{font-size:10.5px; color:var(--fog); font-weight:600;}
 
 /* ---------- Module tiles (More screen) ---------- */

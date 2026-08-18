@@ -99,7 +99,11 @@ const ICONS = {
   sparkle:'<path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
   save:'<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v6h8V4M8 15h8v5"/>',
   chevronLeft:'<path d="m14 6-6 6 6 6"/>',
-  chevronRight:'<path d="m10 6 6 6-6 6"/>'
+  chevronRight:'<path d="m10 6 6 6-6 6"/>',
+  timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6M12 2v3"/>',
+  pause:'<rect x="7" y="5" width="3.2" height="14" rx="1"/><rect x="13.8" y="5" width="3.2" height="14" rx="1"/>',
+  play:'<path d="M7 4.5v15l13-7.5z"/>',
+  stop:'<rect x="5" y="5" width="14" height="14" rx="2"/>'
 };
 function icon(name, size){
   size = size||18;
@@ -645,10 +649,10 @@ async function computeLifeScores(){
 async function renderHome(){
   document.getElementById("topbar-title").textContent = "Life OS";
   const el2 = document.getElementById("screen-home");
-  const [tasks, reminders, expenses, goals, habits, subs, journal, profile, bodyLogs, debts, documents, importantDates] = await Promise.all([
+  const [tasks, reminders, expenses, goals, habits, subs, journal, profile, bodyLogs, debts, documents, importantDates, fastingSessions] = await Promise.all([
     DB.getAll("tasks"), DB.getAll("reminders"), DB.getAll("expenses"), DB.getAll("personalGoals"),
     DB.getAll("habits"), DB.getAll("subscriptions"), DB.getAll("journal"), DB.get("profile","main"), DB.getAll("bodyLogs"),
-    DB.getAll("debts"), DB.getAll("documents"), DB.getAll("importantDates")
+    DB.getAll("debts"), DB.getAll("documents"), DB.getAll("importantDates"), DB.getAll("fastingSessions")
   ]);
   const today = todayStr();
   const todaysTasks = tasks.filter(t=>!t.done && (t.dueDate===today || !t.dueDate));
@@ -662,21 +666,26 @@ async function renderHome(){
   const wroteToday = journal.some(j=>j.date===today);
   const scores = await computeLifeScores();
   const lastBody = bodyLogs.sort((a,b)=>(b.date||"")<(a.date||"")?-1:1)[0];
+  const activeFast = fastingSessions.find(s=>s.status==="active"||s.status==="paused");
 
   // "Important updates" — a rolled-up feed of anything that actually needs the
   // user's attention right now, so Home works as a quick-glance summary.
   const updates = [];
+  if(activeFast){
+    const elapsed = fastElapsedMs(activeFast);
+    updates.push({icon:"timer", text:`Fasting — ${fmtDur(elapsed)} of ${activeFast.plannedHours}h${activeFast.status==="paused"?" (paused)":""}`, tone:"gold", open:"__fasting__"});
+  }
   const overdueTasks = tasks.filter(t=>!t.done && t.dueDate && t.dueDate<today);
-  if(overdueTasks.length) updates.push({icon:"⚠️", text:`${overdueTasks.length} overdue task${overdueTasks.length===1?"":"s"}`, tone:"clay", open:"tasks"});
-  if(todaysReminders.length) updates.push({icon:"⏰", text:`${todaysReminders.length} reminder${todaysReminders.length===1?"":"s"} today: ${todaysReminders.slice(0,2).map(r=>r.title).join(", ")}`, tone:"gold", open:"reminders"});
+  if(overdueTasks.length) updates.push({icon:"bell", text:`${overdueTasks.length} overdue task${overdueTasks.length===1?"":"s"}`, tone:"clay", open:"tasks"});
+  if(todaysReminders.length) updates.push({icon:"bell", text:`${todaysReminders.length} reminder${todaysReminders.length===1?"":"s"} today: ${todaysReminders.slice(0,2).map(r=>r.title).join(", ")}`, tone:"gold", open:"reminders"});
   const soonDebts = debts.filter(d=>d.dueDate && daysUntil(d.dueDate)!=null && daysUntil(d.dueDate)>=0 && daysUntil(d.dueDate)<=7);
-  if(soonDebts.length) updates.push({icon:"🤝", text:`${soonDebts.length} debt${soonDebts.length===1?"":"s"} due within a week`, tone:"clay", open:"debts"});
-  if(subsDue) updates.push({icon:"💳", text:`${subsDue} subscription${subsDue===1?"":"s"} renewing within 7 days`, tone:"gold", open:"subscriptions"});
+  if(soonDebts.length) updates.push({icon:"wallet", text:`${soonDebts.length} debt${soonDebts.length===1?"":"s"} due within a week`, tone:"clay", open:"debts"});
+  if(subsDue) updates.push({icon:"wallet", text:`${subsDue} subscription${subsDue===1?"":"s"} renewing within 7 days`, tone:"gold", open:"subscriptions"});
   const expiringDocs = documents.filter(d=>d.expiryDate && daysUntil(d.expiryDate)!=null && daysUntil(d.expiryDate)>=0 && daysUntil(d.expiryDate)<=30);
-  if(expiringDocs.length) updates.push({icon:"📄", text:`${expiringDocs.length} document${expiringDocs.length===1?"":"s"} expiring within 30 days`, tone:"clay", open:"__documents__"});
+  if(expiringDocs.length) updates.push({icon:"doc", text:`${expiringDocs.length} document${expiringDocs.length===1?"":"s"} expiring within 30 days`, tone:"clay", open:"__documents__"});
   const soonDates = importantDates.filter(d=>d.date && daysUntil(d.date)!=null && daysUntil(d.date)>=0 && daysUntil(d.date)<=7);
-  if(soonDates.length) updates.push({icon:"🎉", text:`${soonDates.length} important date${soonDates.length===1?"":"s"} coming up this week`, tone:"sage", open:"importantDates"});
-  if(!overdueTasks.length && !todaysReminders.length) updates.push({icon:"✅", text:"Nothing urgent — you're on top of things", tone:"sage", open:null});
+  if(soonDates.length) updates.push({icon:"calendar", text:`${soonDates.length} important date${soonDates.length===1?"":"s"} coming up this week`, tone:"sage", open:"importantDates"});
+  if(!overdueTasks.length && !todaysReminders.length && !activeFast) updates.push({icon:"check", text:"Nothing urgent — you're on top of things", tone:"sage", open:null});
 
 
   const age = profile? yearsMonthsSince(profile.birthday) : null;
@@ -701,7 +710,7 @@ async function renderHome(){
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${updates.map(u=>`
           <div class="update-row" ${u.open?`data-open-list="${u.open}"`:""} style="display:flex; align-items:center; gap:10px; padding:8px 9px; border-radius:10px; background:var(--panel-2); ${u.open?'cursor:pointer;':''}">
-            <span style="font-size:15px;">${u.icon}</span>
+            <span style="font-size:15px;">${icon(u.icon,17)}</span>
             <span style="font-size:12.5px; color:var(--paper); flex:1; line-height:1.4;">${esc(u.text)}</span>
             ${u.open? `<span style="color:var(--fog-dim); font-size:12px;">→</span>`:""}
           </div>
@@ -1084,6 +1093,7 @@ async function renderMore(){
     </div>
     <div class="section-label">Track</div>
     <div class="tile-grid">
+      <div class="tile" data-custom="__fasting__"><div class="em">${icon("timer",22)}</div><div class="l">Fasting</div></div>
       <div class="tile" data-open="foodLogs"><div class="em">${icon("bowl",22)}</div><div class="l">Diet</div></div>
       <div class="tile" data-open="gymRoutines"><div class="em">${icon("gym",22)}</div><div class="l">Gym routines</div></div>
       <div class="tile" data-open="workouts"><div class="em">${icon("activity",22)}</div><div class="l">Fitness log</div></div>
@@ -1197,8 +1207,175 @@ const CUSTOM_SCREENS = {
   "__photos__": {label:"Photos", render:renderPhotosScreen},
   "__assistant__": {label:"Assistant", render:renderAssistantScreen},
   "__household__": {label:"Household budget", render:renderHouseholdScreen},
-  "__sharedgoals__": {label:"Shared goals", render:renderSharedGoalsScreen}
+  "__sharedgoals__": {label:"Shared goals", render:renderSharedGoalsScreen},
+  "__fasting__": {label:"Fasting", render:renderFastingScreen}
 };
+/* ---------- Fasting ----------
+   Fully local, no backend needed. A session's status moves
+   active → (paused ⇄ active) → completed/cancelled. Elapsed time excludes
+   any accumulated paused duration so pausing genuinely freezes the clock. */
+const FAST_PRESETS = [12,14,16,18,20,24];
+function fastElapsedMs(s){
+  const start = new Date(s.startTime).getTime();
+  const end = s.endTime? new Date(s.endTime).getTime() : Date.now();
+  let paused = s.totalPausedMs||0;
+  if(s.status==="paused" && s.pausedAt) paused += (Date.now() - new Date(s.pausedAt).getTime());
+  return Math.max(0, end - start - paused);
+}
+function fmtDur(ms){
+  const totalMin = Math.floor(ms/60000);
+  const h = Math.floor(totalMin/60), m = totalMin%60;
+  return `${h}h ${m}m`;
+}
+async function fastingStreak(){
+  const sessions = (await DB.getAll("fastingSessions")).filter(s=>s.status==="completed").sort((a,b)=>(b.startTime||"")<(a.startTime||"")?-1:1);
+  if(!sessions.length) return 0;
+  const days = [...new Set(sessions.map(s=>s.startTime.slice(0,10)))].sort().reverse();
+  let streak = 0; let cursor = new Date();
+  for(const d of days){
+    const cursorStr = cursor.toISOString().slice(0,10);
+    if(d===cursorStr){ streak++; cursor.setDate(cursor.getDate()-1); }
+    else if(d < cursorStr) break;
+  }
+  return streak;
+}
+let fastingTimerHandle = null;
+async function renderFastingScreen(el2){
+  clearInterval(fastingTimerHandle);
+  const sessions = await DB.getAll("fastingSessions");
+  const active = sessions.find(s=>s.status==="active"||s.status==="paused");
+  const completed = sessions.filter(s=>s.status==="completed").sort((a,b)=>(b.startTime||"")<(a.startTime||"")?-1:1);
+  const streak = await fastingStreak();
+  const longest = completed.length? Math.max(...completed.map(fastElapsedMs)) : 0;
+
+  if(active){
+    const plannedMs = active.plannedHours*3600000;
+    el2.innerHTML = `
+      <button class="detail-back" data-back>← Back</button>
+      <div class="card" style="text-align:center; padding:22px 16px;">
+        <div style="font-size:11px; color:var(--fog); letter-spacing:1.5px; text-transform:uppercase; font-weight:700;">${active.status==="paused"?"Paused":"Fasting"}</div>
+        <div style="position:relative; width:210px; height:210px; margin:18px auto;">
+          <svg width="210" height="210" style="transform:rotate(-90deg);">
+            <circle cx="105" cy="105" r="92" fill="none" stroke="var(--panel-2)" stroke-width="9"/>
+            <circle id="fast-ring" cx="105" cy="105" r="92" fill="none" stroke="${active.status==='paused'?'var(--fog-dim)':'var(--gold)'}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${2*Math.PI*92}" style="transition:stroke-dashoffset 1s linear;"/>
+          </svg>
+          <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            <div id="fast-elapsed" style="font-family:var(--font-mono); font-size:26px; font-weight:700; color:var(--paper);">0h 0m</div>
+            <div id="fast-remaining" style="font-size:11.5px; color:var(--fog-dim); margin-top:4px;">of ${active.plannedHours}h planned</div>
+          </div>
+        </div>
+        <div id="fast-pct" style="font-size:13px; color:var(--gold); font-weight:700; margin-bottom:16px;">0%</div>
+        <div class="btn-row">
+          <button class="btn ghost" id="fast-toggle">${active.status==="paused"?icon("play",16)+" Resume":icon("pause",16)+" Pause"}</button>
+          <button class="btn" id="fast-end">${icon("stop",16)} End fast</button>
+        </div>
+        <button class="btn ghost sm" id="fast-cancel" style="margin-top:10px; color:var(--clay);">Cancel (don't count this one)</button>
+      </div>
+      <div class="stat-grid" style="margin-top:16px;">
+        <div class="stat"><div class="n">${streak}</div><div class="l">Day streak</div></div>
+        <div class="stat"><div class="n">${completed.length}</div><div class="l">Total fasts</div></div>
+        <div class="stat"><div class="n">${fmtDur(longest)}</div><div class="l">Longest</div></div>
+      </div>
+      ${fastHistoryHTML(completed)}
+    `;
+    const tick = ()=>{
+      const elapsedEl = document.getElementById("fast-elapsed");
+      if(!elapsedEl){ clearInterval(fastingTimerHandle); return; } // screen navigated away — stop ticking
+      const elapsed = fastElapsedMs(active);
+      const pct = Math.min(100, (elapsed/plannedMs)*100);
+      const remaining = plannedMs - elapsed;
+      elapsedEl.textContent = fmtDur(elapsed);
+      document.getElementById("fast-pct").textContent = Math.round(pct)+"%";
+      document.getElementById("fast-remaining").textContent = remaining>0? fmtDur(remaining)+" left" : "Goal reached — "+fmtDur(-remaining)+" over";
+      const ring = document.getElementById("fast-ring");
+      const c = 2*Math.PI*92;
+      ring.style.strokeDashoffset = c - (pct/100)*c;
+      if(remaining<=0 && !active.notifiedComplete){
+        active.notifiedComplete = true;
+        fireNotification("⏱ Fasting goal reached", `Your ${active.plannedHours}h fast is complete — end it whenever you're ready.`, "fast-"+active.id, "achieve");
+      }
+    };
+    tick();
+    fastingTimerHandle = setInterval(tick, 1000);
+    el2.querySelector("[data-back]").addEventListener("click", popModule);
+    el2.querySelector("#fast-toggle").addEventListener("click", async ()=>{
+      if(active.status==="paused"){
+        active.totalPausedMs = (active.totalPausedMs||0) + (Date.now() - new Date(active.pausedAt).getTime());
+        active.pausedAt = null; active.status = "active";
+      } else {
+        active.pausedAt = nowISO(); active.status = "paused";
+      }
+      await DB.put("fastingSessions", active);
+      renderFastingScreen(el2);
+    });
+    el2.querySelector("#fast-end").addEventListener("click", async ()=>{
+      active.endTime = nowISO(); active.status = "completed";
+      await DB.put("fastingSessions", active);
+      playTone("achieve"); toast("Fast complete — "+fmtDur(fastElapsedMs(active)));
+      renderFastingScreen(el2);
+    });
+    el2.querySelector("#fast-cancel").addEventListener("click", async ()=>{
+      if(!confirm("Cancel this fast? It won't be counted in your history.")) return;
+      active.endTime = nowISO(); active.status = "cancelled";
+      await DB.put("fastingSessions", active);
+      renderFastingScreen(el2);
+    });
+    return;
+  }
+
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <div class="card">
+      <div class="form-head"><div class="form-head-icon" style="background:var(--clay);">${icon("timer",20)}</div><h2>Start a fast</h2></div>
+      <div class="chip-grid" id="fast-presets">
+        ${FAST_PRESETS.map((h,i)=>`<div class="chip-select ${i===2?'active':''}" data-hours="${h}">${h}h</div>`).join("")}
+        <div class="chip-select" data-hours="custom">Custom</div>
+      </div>
+      <div id="fast-custom-wrap" style="display:none; margin-top:10px;">
+        <div class="stepper"><button type="button" class="stepper-btn" data-step="-1">−</button><input id="fast-custom-hours" type="number" value="16"><button type="button" class="stepper-btn" data-step="1">+</button></div>
+      </div>
+      <button class="btn" id="fast-start" style="margin-top:16px;">${icon("play",16)} Start fast</button>
+    </div>
+    <div class="stat-grid" style="margin-top:16px;">
+      <div class="stat"><div class="n">${streak}</div><div class="l">Day streak</div></div>
+      <div class="stat"><div class="n">${completed.length}</div><div class="l">Total fasts</div></div>
+      <div class="stat"><div class="n">${longest?fmtDur(longest):"—"}</div><div class="l">Longest</div></div>
+    </div>
+    ${fastHistoryHTML(completed)}
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  let picked = 16;
+  el2.querySelectorAll("#fast-presets .chip-select").forEach(chip=> chip.addEventListener("click", ()=>{
+    el2.querySelectorAll("#fast-presets .chip-select").forEach(c=>c.classList.remove("active"));
+    chip.classList.add("active");
+    const custom = chip.dataset.hours==="custom";
+    document.getElementById("fast-custom-wrap").style.display = custom? "block":"none";
+    picked = custom? Number(document.getElementById("fast-custom-hours").value) : Number(chip.dataset.hours);
+  }));
+  el2.querySelectorAll("#fast-custom-wrap .stepper-btn").forEach(btn=> btn.addEventListener("click", ()=>{
+    const inp = document.getElementById("fast-custom-hours");
+    inp.value = Math.max(1, Number(inp.value) + Number(btn.dataset.step));
+    picked = Number(inp.value);
+  }));
+  el2.querySelector("#fast-start").addEventListener("click", async ()=>{
+    await DB.add("fastingSessions", {id:uid(), startTime:nowISO(), plannedHours:picked, endTime:null, status:"active", totalPausedMs:0, pausedAt:null, notifiedComplete:false, createdAt:nowISO()});
+    playTone("tap"); toast("Fast started");
+    renderFastingScreen(el2);
+  });
+}
+function fastHistoryHTML(completed){
+  if(!completed.length) return `<div class="section-label">History</div><div class="empty">${icon("timer",26)}<p>No fasts completed yet — start your first one above.</p></div>`;
+  return `<div class="section-label">History</div><div class="card-grid">
+    ${completed.slice(0,12).map(s=>{
+      const ms = fastElapsedMs(s); const hit = ms >= s.plannedHours*3600000;
+      return `<div class="grid-card">
+        <div class="gc-title">${fmtDur(ms)}</div>
+        <div class="gc-sub">${fmtDate(s.startTime.slice(0,10))} • planned ${s.plannedHours}h</div>
+        <div style="font-size:11px; color:${hit?'var(--sage)':'var(--fog-dim)'}; margin-top:2px;">${hit?"✓ Goal hit":"Ended early"}</div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
 /* ---------- Shared goals (optional Supabase sync) ----------
    Local-first as always: everything works and is visible on this device
    without any setup. If SETTINGS.supabaseUrl/supabaseKey are filled in
@@ -3004,25 +3181,25 @@ async function assistantRespondLocal(qRaw){
    QUICK ADD (FAB)
    ========================================================================= */
 const QUICK_ACTIONS = [
-  {em:"📝", l:"Task", mod:"tasks"}, {em:"⏰", l:"Reminder", mod:"reminders"},
-  {em:"💸", l:"Expense", mod:"expenses"}, {em:"💵", l:"Income", mod:"income"},
-  {em:"🤝", l:"Debt", mod:"debts"}, {em:"💳", l:"Subscription", mod:"subscriptions"},
-  {em:"🎯", l:"Goal", mod:"personalGoals"}, {em:"🔥", l:"Habit", mod:"habit"},
-  {em:"📖", l:"Journal", mod:"journal"}, {em:"📕", l:"Book", mod:"books"},
-  {em:"📌", l:"Note", mod:"notes"}, {em:"🎒", l:"Inventory item", mod:"inventory"},
-  {em:"👤", l:"Contact", mod:"contacts"}, {em:"📄", l:"Document", mod:"document"},
-  {em:"✈️", l:"Trip", mod:"trip"}, {em:"😊", l:"Mood", mod:"moods"},
-  {em:"🙏", l:"Gratitude", mod:"gratitude"}, {em:"🏋️", l:"Workout", mod:"workouts"},
-  {em:"😴", l:"Sleep", mod:"sleepLogs"}, {em:"🎉", l:"Special date", mod:"importantDates"},
-  {em:"💞", l:"Relationship", mod:"relationships"}, {em:"⚖️", l:"Body log", mod:"bodyLogs"},
-  {em:"🖼️", l:"Photo", mod:"photo"}, {em:"🥗", l:"Meal", mod:"foodLogs"},
-  {em:"💪", l:"Gym routine", mod:"gymRoutines"}
+  {ic:"check", l:"Task", mod:"tasks"}, {ic:"bell", l:"Reminder", mod:"reminders"},
+  {ic:"wallet", l:"Expense", mod:"expenses"}, {ic:"wallet", l:"Income", mod:"income"},
+  {ic:"wallet", l:"Debt", mod:"debts"}, {ic:"wallet", l:"Subscription", mod:"subscriptions"},
+  {ic:"target", l:"Goal", mod:"personalGoals"}, {ic:"flame", l:"Habit", mod:"habit"},
+  {ic:"book", l:"Journal", mod:"journal"}, {ic:"book", l:"Book", mod:"books"},
+  {ic:"note", l:"Note", mod:"notes"}, {ic:"box", l:"Inventory item", mod:"inventory"},
+  {ic:"user", l:"Contact", mod:"contacts"}, {ic:"doc", l:"Document", mod:"document"},
+  {ic:"plane", l:"Trip", mod:"trip"}, {ic:"smile", l:"Mood", mod:"moods"},
+  {ic:"heart", l:"Gratitude", mod:"gratitude"}, {ic:"activity", l:"Workout", mod:"workouts"},
+  {ic:"moon", l:"Sleep", mod:"sleepLogs"}, {ic:"calendar", l:"Special date", mod:"importantDates"},
+  {ic:"heart", l:"Relationship", mod:"relationships"}, {ic:"scale", l:"Body log", mod:"bodyLogs"},
+  {ic:"image", l:"Photo", mod:"photo"}, {ic:"bowl", l:"Meal", mod:"foodLogs"},
+  {ic:"gym", l:"Gym routine", mod:"gymRoutines"}, {ic:"timer", l:"Start a fast", mod:"fasting"}
 ];
 function openQuickAdd(){
   openSheet(`
     <div class="sheet-title">Quick add</div>
     <div class="qa-grid">
-      ${QUICK_ACTIONS.map(a=>`<div class="qa-item" data-mod="${a.mod}"><span class="em">${a.em}</span><span class="l">${a.l}</span></div>`).join("")}
+      ${QUICK_ACTIONS.map(a=>`<div class="qa-item" data-mod="${a.mod}"><span class="em">${icon(a.ic,20)}</span><span class="l">${a.l}</span></div>`).join("")}
     </div>
   `);
   document.querySelectorAll(".qa-item").forEach(n=> n.addEventListener("click", ()=>{
@@ -3031,6 +3208,7 @@ function openQuickAdd(){
     if(n.dataset.mod==="document"){ openDocumentForm(); return; }
     if(n.dataset.mod==="trip"){ pushModule("form","trips",null); return; }
     if(n.dataset.mod==="photo"){ pushModule("list","__photos__",null); return; }
+    if(n.dataset.mod==="fasting"){ pushModule("list","__fasting__",null); return; }
     pushModule("form", n.dataset.mod, null);
   }));
 }

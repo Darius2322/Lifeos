@@ -2,8 +2,14 @@
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.16.1";
+const APP_VERSION = "1.17.0";
 const CHANGELOG = [
+  {version:"1.17.0", changes:[
+    "New: Fasting tracker — presets or custom hours, a live circular timer, pause/resume, history, streaks, and a completion notification, fully offline",
+    "Home page now shows an active fast in Important updates",
+    "Quick Add converted to icons and got a 'Start a fast' entry",
+    "Home's Important updates icons converted from emoji to real icons"
+  ]},
   {version:"1.16.1", changes:[
     "New: standalone terms.html page to match privacy.html, cross-linked to each other",
     "Confirmed Plan and Grow are fully on the 2-column card grid — no leftover single-column lists"
@@ -87,7 +93,7 @@ const CHANGELOG = [
   ]}
 ];
 const DB_NAME = "lifeos";
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
 // travel (trips/itinerary/expenses), places/bucket list, timeline, importantDates.
 // Phase 3 adds: sleep log, on-device app-usage log, location log.
@@ -141,7 +147,8 @@ const STORES = [
   {name:"gymRoutines", key:"id"},
   {name:"householdMembers", key:"id"},
   {name:"sharedGoals", key:"id"},
-  {name:"sharedGoalContributions", key:"id", indexes:["goalId"]}
+  {name:"sharedGoalContributions", key:"id", indexes:["goalId"]},
+  {name:"fastingSessions", key:"id", indexes:["startTime","status"]}
 ];
 
 const DB = {

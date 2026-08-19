@@ -5,8 +5,13 @@ const CONFIG = window.LIFEOS_CONFIG || {};
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.19.0";
+const APP_VERSION = "1.19.1";
 const CHANGELOG = [
+  {version:"1.19.1", changes:[
+    "Plan tab's Today section is now a real timeline — tasks and reminders due today merge into Morning/Afternoon/Evening groups, sorted by time",
+    "Tasks can now optionally have a time, not just a date",
+    "Completed items for today move into their own collapsed-looking section instead of just getting struck through in place"
+  ]},
   {version:"1.19.0", changes:[
     "New: Quiet Hours — set a start/end window where notification popups and sounds are held back (fasting alerts can still get through if you allow it); nothing is lost, it's still in the 🔔 bell",
     "New: Reminder sounds per category — Tasks, Habits, Goals, Fasting, Money/Bills, Debts, and General reminders can each use a different tone (or none), with a Test button for each",

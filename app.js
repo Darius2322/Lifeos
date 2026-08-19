@@ -195,6 +195,7 @@ const MODULES = {
     fields:[
       {key:"title", label:"Task", type:"text", required:true},
       {key:"dueDate", label:"Due date", type:"date"},
+      {key:"time", label:"Time (optional)", type:"time"},
       {key:"priority", label:"Priority", type:"select", options:["Normal","High","Top 3"]},
       {key:"notes", label:"Notes", type:"textarea"}
     ],
@@ -850,15 +851,40 @@ async function renderPlan(){
   const today = todayStr();
   const overdue = tasks.filter(t=>!t.done && t.dueDate && t.dueDate<today);
   const dueToday = tasks.filter(t=>!t.done && t.dueDate===today);
+  const doneToday = tasks.filter(t=>t.done && t.dueDate===today);
   const upcoming = tasks.filter(t=>!t.done && t.dueDate && t.dueDate>today).sort((a,b)=>a.dueDate<b.dueDate?-1:1);
   const noDate = tasks.filter(t=>!t.done && !t.dueDate);
   const doneCount = tasks.filter(t=>t.done).length;
-  const activeReminders = reminders.filter(r=>!r.done).sort((a,b)=>(a.dueDate||"")<(b.dueDate||"")?-1:1);
+  const todaysReminders = reminders.filter(r=>!r.done && reminderOccursOn(r, today));
+  const laterReminders = reminders.filter(r=>!r.done && !reminderOccursOn(r, today)).sort((a,b)=>(a.dueDate||"")<(b.dueDate||"")?-1:1);
   const weekStart = (()=>{ const d=new Date(); d.setDate(d.getDate()-d.getDay()); return d.toISOString().slice(0,10); })();
   const weekTasks = tasks.filter(t=>t.dueDate && t.dueDate>=weekStart);
   const weekDone = weekTasks.filter(t=>t.done).length;
   const weekPct = weekTasks.length? Math.round((weekDone/weekTasks.length)*100) : 0;
 
+  // Today's timeline: tasks + reminders due today, bucketed by time of day.
+  // Anything without a set time goes in "Anytime" rather than being guessed.
+  const todayItems = [
+    ...dueToday.map(t=>({kind:"task", id:t.id, title:t.title, time:t.time, done:false, priority:t.priority})),
+    ...doneToday.map(t=>({kind:"task", id:t.id, title:t.title, time:t.time, done:true, priority:t.priority})),
+    ...todaysReminders.map(r=>({kind:"reminder", id:r.id, title:r.title, time:r.time, done:false}))
+  ];
+  const bucketOf = (t)=>{ if(!t) return "Anytime"; const h=Number(t.split(":")[0]); return h<12?"Morning":h<17?"Afternoon":"Evening"; };
+  const buckets = {Morning:[], Afternoon:[], Evening:[], Anytime:[]};
+  todayItems.filter(i=>!i.done).forEach(i=> buckets[bucketOf(i.time)].push(i));
+  Object.values(buckets).forEach(list=> list.sort((a,b)=>(a.time||"99:99")<(b.time||"99:99")?-1:1));
+  const completedToday = todayItems.filter(i=>i.done);
+
+  function timelineRow(i){
+    const pClass = i.kind==="task" && i.priority==="Top 3"?"top3":i.kind==="task" && i.priority==="High"?"high":"";
+    return `<div class="plan-task ${pClass}" data-tl-id="${i.id}" data-tl-kind="${i.kind}" style="display:flex; align-items:center; gap:10px; padding:9px 4px;">
+      <div class="chk" data-tl-toggle="${i.id}" data-tl-toggle-kind="${i.kind}"></div>
+      <div style="flex:1;" data-tl-open="${i.id}" data-tl-open-kind="${i.kind}">
+        <div style="font-size:13.5px; color:var(--paper); font-weight:500;">${esc(i.title)}</div>
+      </div>
+      ${i.time? `<div style="font-size:11px; color:var(--fog-dim); font-family:var(--font-mono);">${esc(i.time)}</div>`:""}
+    </div>`;
+  }
   function taskCard(t){
     const pClass = t.priority==="Top 3"?"top3":t.priority==="High"?"high":"";
     return `<div class="grid-card ${pClass}" data-id="${t.id}">
@@ -885,7 +911,7 @@ async function renderPlan(){
     <div class="plan-hero">
       <div class="plan-hero-stat" data-open-list="tasks"><div class="n" style="color:${overdue.length?'var(--clay)':'var(--paper)'}">${overdue.length}</div><div class="l">Overdue</div></div>
       <div class="plan-hero-stat" data-open-list="tasks"><div class="n">${dueToday.length}</div><div class="l">Due today</div></div>
-      <div class="plan-hero-stat" data-open-list="reminders"><div class="n">${activeReminders.length}</div><div class="l">Reminders</div></div>
+      <div class="plan-hero-stat" data-open-list="reminders"><div class="n">${todaysReminders.length+laterReminders.length}</div><div class="l">Reminders</div></div>
       <button class="plan-hero-cal" id="plan-cal-btn">${icon("calendar",18)}<span>Calendar</span></button>
     </div>
     ${weekTasks.length? `<div class="card" style="padding:12px 14px; margin-bottom:14px;">
@@ -896,16 +922,19 @@ async function renderPlan(){
       <div style="height:6px; background:var(--panel-2); border-radius:4px; overflow:hidden;"><div style="height:100%; width:${weekPct}%; background:var(--gold); transition:width .4s ease;"></div></div>
     </div>`:""}
 
-    <div class="section-label">Reminders</div>
-    <div class="card-grid">
-      ${activeReminders.length? activeReminders.map(remCard).join("") : `<div class="empty full-span">${icon("bell",26)}<p>No reminders yet.</p></div>`}
+    <div class="section-label">Today</div>
+    <div class="card">
+      ${["Morning","Afternoon","Evening","Anytime"].map(b=> buckets[b].length? `
+        <div style="font-size:10.5px; color:var(--fog-dim); text-transform:uppercase; letter-spacing:0.5px; font-weight:700; margin:10px 0 2px;">${b}</div>
+        ${buckets[b].map(timelineRow).join("")}
+      ` : "").join("") || `<div class="empty">${icon("check",26)}<p>Nothing on today's timeline.</p></div>`}
+      ${completedToday.length? `<div style="font-size:10.5px; color:var(--fog-dim); text-transform:uppercase; letter-spacing:0.5px; font-weight:700; margin:12px 0 2px; border-top:1px solid var(--line); padding-top:10px;">Completed</div>
+        ${completedToday.map(i=>`<div style="display:flex; align-items:center; gap:10px; padding:7px 4px; opacity:0.55;">
+          <div class="chk done">✓</div><div style="flex:1; font-size:13px; text-decoration:line-through; color:var(--fog);">${esc(i.title)}</div>
+        </div>`).join("")}` : ""}
     </div>
-    <div style="margin:12px 0 14px;"><button class="btn ghost" data-new="reminders">+ Add reminder</button></div>
 
     ${overdue.length? `<div class="section-label" style="color:var(--clay);">Overdue</div><div class="card-grid">${overdue.map(taskCard).join("")}</div>`:""}
-
-    <div class="section-label">Today</div>
-    <div class="card-grid">${dueToday.length? dueToday.map(taskCard).join("") : `<div class="empty full-span">${icon("check",26)}<p>Nothing due today.</p></div>`}</div>
 
     <div class="section-label">Upcoming</div>
     <div class="card-grid">${upcoming.length? upcoming.slice(0,8).map(taskCard).join("") : `<div class="empty full-span"><p>Nothing scheduled.</p></div>`}</div>
@@ -913,6 +942,12 @@ async function renderPlan(){
     ${noDate.length? `<div class="section-label">No date</div><div class="card-grid">${noDate.map(taskCard).join("")}</div>`:""}
 
     <div style="margin:14px 0;"><button class="btn" data-new="tasks">+ Add task</button></div>
+
+    <div class="section-label">Reminders</div>
+    <div class="card-grid">
+      ${laterReminders.length? laterReminders.map(remCard).join("") : `<div class="empty full-span">${icon("bell",26)}<p>No upcoming reminders — today's are shown above.</p></div>`}
+    </div>
+    <div style="margin:12px 0 14px;"><button class="btn ghost" data-new="reminders">+ Add reminder</button></div>
 
     <div class="section-label">Notes ${doneCount?`<span style="color:var(--fog-dim); text-transform:none; letter-spacing:0;">· ${doneCount} tasks completed all-time</span>`:''}</div>
     <div class="card-grid" id="plan-notes-preview"></div>
@@ -924,6 +959,21 @@ async function renderPlan(){
     <div class="grid-card" data-open="${n.id}"><div class="gc-title">${icon("note",14)} ${esc(n.title)}</div><div class="gc-sub">${esc((n.body||"").slice(0,50))}</div></div>
   `).join("") : `<div class="empty full-span"><p>No notes yet.</p></div>`;
   document.getElementById("plan-notes-preview").querySelectorAll("[data-open]").forEach(n=> n.addEventListener("click", ()=> pushModule("detail","notes",n.dataset.open)));
+
+  // Today timeline handlers (merged tasks + reminders)
+  el2.querySelectorAll("[data-tl-toggle]").forEach(n=> n.addEventListener("click", async (e)=>{
+    e.stopPropagation();
+    const kind = n.dataset.tlToggleKind, id = n.dataset.tlToggle;
+    if(kind==="task"){
+      const t = await DB.get("tasks", id); t.done = true; t.completedAt = nowISO(); await DB.put("tasks", t);
+      playCategorySound("tasks"); toast("Task completed");
+    } else {
+      const r = await DB.get("reminders", id); r.done = true; await DB.put("reminders", r);
+      toast("Reminder marked done");
+    }
+    renderPlan();
+  }));
+  el2.querySelectorAll("[data-tl-open]").forEach(n=> n.addEventListener("click", ()=> pushModule("form", n.dataset.tlOpenKind==="task"?"tasks":"reminders", n.dataset.tlOpen)));
 
   el2.querySelectorAll("[data-toggle]").forEach(n=> n.addEventListener("click", async (e)=>{
     e.stopPropagation(); const t = await DB.get("tasks", n.dataset.toggle); t.done=!t.done; t.completedAt = t.done? nowISO(): null; await DB.put("tasks", t);

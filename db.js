@@ -2,8 +2,13 @@
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.17.0";
+const APP_VERSION = "1.17.1";
 const CHANGELOG = [
+  {version:"1.17.1", changes:[
+    "New: Learning tracker — courses, books, skills, subjects, or projects with progress, dates, and notes",
+    "Grow tab now shows active learning items with a progress bar",
+    "Learning added to Quick Add and More → Track"
+  ]},
   {version:"1.17.0", changes:[
     "New: Fasting tracker — presets or custom hours, a live circular timer, pause/resume, history, streaks, and a completion notification, fully offline",
     "Home page now shows an active fast in Important updates",
@@ -93,7 +98,7 @@ const CHANGELOG = [
   ]}
 ];
 const DB_NAME = "lifeos";
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
 // travel (trips/itinerary/expenses), places/bucket list, timeline, importantDates.
 // Phase 3 adds: sleep log, on-device app-usage log, location log.
@@ -148,7 +153,8 @@ const STORES = [
   {name:"householdMembers", key:"id"},
   {name:"sharedGoals", key:"id"},
   {name:"sharedGoalContributions", key:"id", indexes:["goalId"]},
-  {name:"fastingSessions", key:"id", indexes:["startTime","status"]}
+  {name:"fastingSessions", key:"id", indexes:["startTime","status"]},
+  {name:"learningItems", key:"id", indexes:["status"]}
 ];
 
 const DB = {

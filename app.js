@@ -103,7 +103,8 @@ const ICONS = {
   timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6M12 2v3"/>',
   pause:'<rect x="7" y="5" width="3.2" height="14" rx="1"/><rect x="13.8" y="5" width="3.2" height="14" rx="1"/>',
   play:'<path d="M7 4.5v15l13-7.5z"/>',
-  stop:'<rect x="5" y="5" width="14" height="14" rx="2"/>'
+  stop:'<rect x="5" y="5" width="14" height="14" rx="2"/>',
+  graduation:'<path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/><path d="M22 9v6"/>'
 };
 function icon(name, size){
   size = size||18;
@@ -464,6 +465,19 @@ const MODULES = {
       {key:"notes", label:"Notes", type:"textarea"}
     ],
     title:r=>r.name, sub:r=>r.relation
+  },
+  learning: {
+    label:"Learning", icon:"graduation", color:"var(--blue)", store:"learningItems",
+    fields:[
+      {key:"title", label:"Title", type:"text", required:true},
+      {key:"type", label:"Type", type:"select", options:["Course","Book","Skill","Subject","Project"]},
+      {key:"status", label:"Status", type:"select", options:["Not started","In progress","Completed"]},
+      {key:"progress", label:"Progress (%)", type:"number"},
+      {key:"startDate", label:"Start date", type:"date"},
+      {key:"targetDate", label:"Target completion", type:"date"},
+      {key:"notes", label:"Notes", type:"textarea"}
+    ],
+    title:r=>r.title, sub:r=> (r.type||"")+(r.status?" • "+r.status:"")
   }
 };
 
@@ -977,13 +991,14 @@ async function renderMoney(){
 async function renderGrow(){
   document.getElementById("topbar-title").textContent = "Grow";
   const el2 = document.getElementById("screen-grow");
-  const [goals, habits, allCompletions] = await Promise.all([DB.getAll("personalGoals"), DB.getAll("habits"), DB.getAll("habitCompletions")]);
+  const [goals, habits, allCompletions, learning] = await Promise.all([DB.getAll("personalGoals"), DB.getAll("habits"), DB.getAll("habitCompletions"), DB.getAll("learningItems")]);
   const streaks = {};
   for(const h of habits) streaks[h.id] = await habitStreak(h.id);
   const doneToday = {};
   const todaysComps = allCompletions.filter(c=>c.date===todayStr());
   todaysComps.forEach(c=> doneToday[c.habitId]=true);
   const completedGoals = goals.filter(g=>g.status==="Completed").length;
+  const activeLearning = learning.filter(l=>l.status!=="Completed");
   const last7 = Array.from({length:7}, (_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(6-i)); return d.toISOString().slice(0,10); });
   function trail(habitId){
     const doneDates = new Set(allCompletions.filter(c=>c.habitId===habitId).map(c=>c.date));
@@ -1036,7 +1051,18 @@ async function renderGrow(){
       ${goals.filter(g=>g.term!=="Long-term" && g.status!=="Completed").length? goals.filter(g=>g.term!=="Long-term" && g.status!=="Completed").map(g=>goalCard(g,"target")).join("") : `<div class="empty full-span">${icon("target",28)}<p>No goals yet.</p></div>`}
     </div>
     ${completedGoals? `<div style="display:flex; align-items:center; gap:6px; margin:10px 0; font-size:12px; color:var(--fog);">${icon("trophy",15)}<span>${completedGoals} goal(s) completed</span></div>`:""}
-    <button class="btn" data-new="personalGoals">+ Add goal</button>
+    <div style="margin-bottom:14px;"><button class="btn ghost" data-new="personalGoals">+ Add goal</button></div>
+
+    <div class="section-label">Learning</div>
+    <div class="card-grid">
+      ${activeLearning.length? activeLearning.map(l=>`
+        <div class="grid-card" data-open="learning|${l.id}">
+          <div class="gc-title">${esc(l.title)}</div>
+          <div class="gc-sub">${esc(l.type||"")}${l.status?" • "+esc(l.status):""}</div>
+          <div style="height:5px; background:var(--panel-2); border-radius:4px; margin-top:6px; overflow:hidden;"><div style="height:100%; width:${Math.min(100,Number(l.progress)||0)}%; background:var(--blue); transition:width .4s ease;"></div></div>
+        </div>`).join("") : `<div class="empty full-span">${icon("graduation",28)}<p>No courses, books, or skills being tracked yet.</p></div>`}
+    </div>
+    <button class="btn" data-new="learning">+ Add learning item</button>
   `;
   el2.querySelectorAll("[data-habit]").forEach(n=> n.addEventListener("click", async ()=>{
     const willComplete = !doneToday[n.dataset.habit];
@@ -1094,6 +1120,7 @@ async function renderMore(){
     <div class="section-label">Track</div>
     <div class="tile-grid">
       <div class="tile" data-custom="__fasting__"><div class="em">${icon("timer",22)}</div><div class="l">Fasting</div></div>
+      <div class="tile" data-open="learning"><div class="em">${icon("graduation",22)}</div><div class="l">Learning</div></div>
       <div class="tile" data-open="foodLogs"><div class="em">${icon("bowl",22)}</div><div class="l">Diet</div></div>
       <div class="tile" data-open="gymRoutines"><div class="em">${icon("gym",22)}</div><div class="l">Gym routines</div></div>
       <div class="tile" data-open="workouts"><div class="em">${icon("activity",22)}</div><div class="l">Fitness log</div></div>
@@ -3193,7 +3220,8 @@ const QUICK_ACTIONS = [
   {ic:"moon", l:"Sleep", mod:"sleepLogs"}, {ic:"calendar", l:"Special date", mod:"importantDates"},
   {ic:"heart", l:"Relationship", mod:"relationships"}, {ic:"scale", l:"Body log", mod:"bodyLogs"},
   {ic:"image", l:"Photo", mod:"photo"}, {ic:"bowl", l:"Meal", mod:"foodLogs"},
-  {ic:"gym", l:"Gym routine", mod:"gymRoutines"}, {ic:"timer", l:"Start a fast", mod:"fasting"}
+  {ic:"gym", l:"Gym routine", mod:"gymRoutines"}, {ic:"timer", l:"Start a fast", mod:"fasting"},
+  {ic:"graduation", l:"Learning item", mod:"learning"}
 ];
 function openQuickAdd(){
   openSheet(`
@@ -3511,7 +3539,7 @@ function openAboutSheet(){
     Live now: Dashboard with life-balance ring, age & education timeline, and body metrics, profile photo, About Me (birthday, sex, education, hobbies, fears), a local AI-free "Assistant" that answers questions from your own data (now covering diet & gym too), first-run onboarding, Tasks, Reminders with repeat, Notes, Expenses, Income, Budgets, Debts, Subscriptions, Goals (short & long-term), Habits with streaks, Journal, Mood, Gratitude, Sleep log, Cycle log, Body metrics, Diet log, Gym routines (with auto weekly reminders), Reading tracker with streaks, Fitness log, Inventory, Contacts, Friends & relationships, local Document vault, Photos, Travel planner (itinerary + expenses), Places & bucket list, Calendar with a full activity history, Life timeline, Location log (auto + manual), on-device app usage, auto-computed Achievements, Weekly & Monthly review, global search, notifications with sound & vibration (with a test button), Share app + QR code, quick add, PIN + biometric lock, light/dark theme, and full JSON backup/restore (built for moving to a new phone).
     </p>
     <p style="font-size:13px; color:var(--fog); line-height:1.6;">
-    Still on the roadmap: Entertainment tracker, a dedicated Learning tracker, richer personal analytics, and a formal Reports screen.
+    Still on the roadmap: Entertainment tracker, richer personal analytics, and a formal Reports screen.
     </p>
     <div style="border-top:1px solid var(--line); margin-top:16px; padding-top:14px;">
       <h2 style="font-size:14px;"><span class="em">👨‍💻</span>Developer</h2>

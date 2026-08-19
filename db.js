@@ -1,9 +1,23 @@
 /* Life OS — db.js: IndexedDB layer, versioned, generic CRUD. Everything local, nothing external. */
+// Developer-only credentials live in config.js (never in Settings UI or IndexedDB).
+// This falls back to an empty object if config.js is missing so the app never crashes.
+const CONFIG = window.LIFEOS_CONFIG || {};
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.17.1";
+const APP_VERSION = "1.19.0";
 const CHANGELOG = [
+  {version:"1.19.0", changes:[
+    "New: Quiet Hours — set a start/end window where notification popups and sounds are held back (fasting alerts can still get through if you allow it); nothing is lost, it's still in the 🔔 bell",
+    "New: Reminder sounds per category — Tasks, Habits, Goals, Fasting, Money/Bills, Debts, and General reminders can each use a different tone (or none), with a Test button for each",
+    "Notification bell panel icons converted from emoji to real icons"
+  ]},
+  {version:"1.18.0", changes:[
+    "Removed all developer/backend configuration from Settings — no more Supabase URL, Supabase key, or Google Client ID fields in the app",
+    "New: config.js — a separate file the developer edits directly before deploying, never shown in the app itself",
+    "Settings now shows plain on/off status for Online AI, Shared goals, and Google Drive backup instead of raw credential fields",
+    "Privacy Policy and Terms updated to reflect that these credentials are set by whoever deploys the app, not by the person using it"
+  ]},
   {version:"1.17.1", changes:[
     "New: Learning tracker — courses, books, skills, subjects, or projects with progress, dates, and notes",
     "Grow tab now shows active learning items with a progress bar",

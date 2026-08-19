@@ -1,5 +1,5 @@
 /* Life OS — settings.js: user settings state, theme, and the Settings screen. */
-let SETTINGS = {id:"main", name:"Darius", currency:"KSh", theme:"dark", pinHash:null, lockTimeoutMin:2, weekStart:1, notificationsOn:false, webauthnId:null, autoLocationOn:false, onboardingComplete:false};
+let SETTINGS = {id:"main", name:"Darius", currency:"KSh", theme:"dark", pinHash:null, lockTimeoutMin:2, weekStart:1, notificationsOn:false, webauthnId:null, autoLocationOn:false, onboardingComplete:false, soundsOn:true, soundPrefs:{}, quietHoursOn:false, quietHoursStart:"22:00", quietHoursEnd:"06:00", quietHoursBypassFasting:true};
 
 async function loadSettings(){
   const s = await DB.get("settings", "main");
@@ -48,60 +48,100 @@ function openSettingsSheet(){
       ${SETTINGS.notificationsOn? `<button class="btn ghost sm" id="st-notif-test">🔔 Send test</button>`:""}
     </div>
     <p class="field-hint">Uses your phone's default notification sound and vibration. Fires while Life OS is open — this is a fully offline app, so background push isn't possible without a server. On iPhone, notifications only work if you've added Life OS to your Home Screen (Share → Add to Home Screen) — Safari tabs can't show them at all.</p>
-    <label>Sound cues</label>
+    <label>Quiet hours</label>
+    <div class="chips">
+      <span class="chip ${SETTINGS.quietHoursOn?'active':''}" id="st-qh-on">On</span>
+      <span class="chip ${!SETTINGS.quietHoursOn?'active':''}" id="st-qh-off">Off</span>
+    </div>
+    <div id="st-qh-wrap" style="${SETTINGS.quietHoursOn?'':'display:none;'} margin-top:10px;">
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;"><label style="margin-top:0;">Start</label><input id="st-qh-start" type="time" value="${esc(SETTINGS.quietHoursStart||'22:00')}"></div>
+        <div style="flex:1;"><label style="margin-top:0;">End</label><input id="st-qh-end" type="time" value="${esc(SETTINGS.quietHoursEnd||'06:00')}"></div>
+      </div>
+      <div class="chips" style="margin-top:10px;">
+        <span class="chip ${SETTINGS.quietHoursBypassFasting!==false?'active':''}" id="st-qh-bypass">Let fasting alerts through anyway</span>
+      </div>
+    </div>
+    <p class="field-hint">During quiet hours, notification popups and sounds are held back — nothing is lost, it still shows up in the 🔔 bell when you next open the app.</p>
+    <label>Reminder sounds</label>
     <div class="chips">
       <span class="chip ${SETTINGS.soundsOn!==false?'active':''}" id="st-sounds-on">🔊 On</span>
       <span class="chip ${SETTINGS.soundsOn===false?'active':''}" id="st-sounds-off">🔇 Off</span>
-      <span class="chip" id="st-sounds-test">▶ Test</span>
     </div>
-    <p class="field-hint">Short distinct tones for completing a task, finishing a habit, and a shared goal being achieved — synthesized on-device, no audio files.</p>
+    <div id="st-sound-cats" style="${SETTINGS.soundsOn===false?'display:none;':''} margin-top:10px;">
+      ${SOUND_CATEGORIES.map(cat=>{
+        const label = {tasks:"Tasks",habits:"Habits",goals:"Goals",fasting:"Fasting",money:"Money/Bills",debts:"Debts",general:"General reminders"}[cat];
+        const current = (SETTINGS.soundPrefs||{})[cat] || "chime";
+        return `<div style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <span style="font-size:12px; color:var(--fog); font-weight:600;">${label}</span>
+            <span class="chip sm" data-test-cat="${cat}" style="padding:3px 9px; font-size:11px;">▶ Test</span>
+          </div>
+          <div class="chips" data-cat-group="${cat}">
+            ${Object.keys(SOUND_STYLES).map(style=>`<span class="chip ${current===style?'active':''}" data-style="${style}">${style[0].toUpperCase()+style.slice(1)}</span>`).join("")}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+    <p class="field-hint">Each category can use its own sound style, or none. "Test" plays it right now.</p>
     <label>Developer contact (shown in About)</label>
     <input id="st-dev-phone" value="${esc(SETTINGS.devPhone||'')}" placeholder="Phone number" type="tel">
     <input id="st-dev-email" value="${esc(SETTINGS.devEmail||'')}" placeholder="Email" type="email" style="margin-top:8px;">
     <p class="field-hint">Only shown to you in the About screen of this install — not sent anywhere.</p>
-    <label>🤖 Online AI (optional)</label>
+    <label>${icon("sparkle",14)} Online AI</label>
     <div class="chips">
       <span class="chip ${!SETTINGS.aiOnline?'active':''}" id="st-ai-off">Local only</span>
-      <span class="chip ${SETTINGS.aiOnline?'active':''}" id="st-ai-on">Real AI when online</span>
+      <span class="chip ${SETTINGS.aiOnline?'active':''}" id="st-ai-on" ${CONFIG.anthropicKey?'':'style="opacity:0.5;"'}>Real AI when online</span>
     </div>
-    <div id="st-ai-key-wrap" style="${SETTINGS.aiOnline?'':'display:none;'} margin-top:10px;">
-      <input id="st-ai-key" type="password" value="${esc(SETTINGS.anthropicKey||'')}" placeholder="Your Anthropic API key (sk-ant-...)">
-      <p class="field-hint">⚠️ This app has no backend, so the key is stored on this device and sent <b>directly from your browser</b> to Anthropic when you ask the Assistant something while online. It's visible in your browser's network tab — use a key with a spending limit set, and never share this device's backup file with anyone you don't trust. When off, or when you're offline, the Assistant keeps working exactly as before using only your local data — nothing breaks either way. Get a key at console.anthropic.com.</p>
+    <p class="field-hint">${CONFIG.anthropicKey? "Available on this install. When on, the Assistant can use a real AI model while you're online; it always falls back to local answers when offline." : "Not set up on this install — ask the developer to enable it. Until then this stays off and the Assistant uses local answers only."}</p>
+    <label>${icon("link",14)} Shared goals</label>
+    <div class="chips">
+      <span class="chip ${SETTINGS.shareProfileOnGoals?'active':''}" id="st-share-profile">Share my name/photo/birthday on goals I join</span>
     </div>
-    <label>🔗 Shared goals (optional — needs Supabase)</label>
-    <input id="st-sb-url" value="${esc(SETTINGS.supabaseUrl||'')}" placeholder="Supabase project URL">
-    <input id="st-sb-key" type="password" value="${esc(SETTINGS.supabaseKey||'')}" placeholder="Supabase anon key" style="margin-top:8px;">
-    <p class="field-hint">Lets you and anyone you share a goal code with — your wife, a friend, a group — each run Life OS on your own phone and see the same progress live. Needs a free Supabase project. Go to Money → Shared goals for the exact table setup, then paste the URL and anon key here. Without this, Shared goals still works but stays local to this device only.</p>
-    <div class="chips" style="margin-top:10px;">
-      <span class="chip ${SETTINGS.shareProfileOnGoals?'active':''}" id="st-share-profile">🙂 Share my name/photo/birthday on goals I join</span>
-    </div>
-    <p class="field-hint">Off by default. When on, people who share a goal code with you can see your name, a small photo, and — only if your profile has a birthday set — your birthday. This is what lets the app notify others when you hit a shared goal or on your birthday.</p>
-    <label>☁️ Google Drive backup (optional)</label>
-    <input id="st-google-id" value="${esc(SETTINGS.googleClientId||'')}" placeholder="Google OAuth Client ID">
-    <p class="field-hint">Needs a free OAuth Client ID (Web application type) from Google Cloud Console, with this app's hosted URL added as an authorized JavaScript origin. Once set, More → Backup & restore gets one-tap backup/restore to your own Drive — the app only ever sees files it created itself, never the rest of your Drive.</p>
+    <p class="field-hint">${CONFIG.supabaseUrl? "Off by default. When on, people who share a goal code with you can see your name, a small photo, and — only if your profile has a birthday set — your birthday. Lets the app notify others when you hit a shared goal or on your birthday." : "Shared goals will stay local-only on this install until the developer connects a sync service — ask the developer if you'd like this enabled."}</p>
+    <label>${icon("save",14)} Google Drive backup</label>
+    <p class="field-hint">${CONFIG.googleClientId? "Available — More → Backup & restore has one-tap backup/restore to your own Drive." : "Not set up on this install — ask the developer to enable it. Manual export/restore from a file still works either way."}</p>
     <div style="margin-top:22px;">
       <button class="btn danger sm" id="st-wipe">Delete all data</button>
     </div>
     <button class="btn" id="st-save" style="margin-top:18px;">Save settings</button>
   `);
-  document.getElementById("st-ai-off").onclick = ()=>{ document.getElementById("st-ai-off").classList.add("active"); document.getElementById("st-ai-on").classList.remove("active"); document.getElementById("st-ai-key-wrap").style.display="none"; };
-  document.getElementById("st-ai-on").onclick = ()=>{ document.getElementById("st-ai-on").classList.add("active"); document.getElementById("st-ai-off").classList.remove("active"); document.getElementById("st-ai-key-wrap").style.display="block"; };
+  document.getElementById("st-ai-off").onclick = ()=>{ document.getElementById("st-ai-off").classList.add("active"); document.getElementById("st-ai-on").classList.remove("active"); };
+  document.getElementById("st-ai-on").onclick = ()=>{ if(!CONFIG.anthropicKey){ toast("Not available on this install yet"); return; } document.getElementById("st-ai-on").classList.add("active"); document.getElementById("st-ai-off").classList.remove("active"); };
   document.getElementById("st-share-profile").onclick = (e)=> e.target.classList.toggle("active");
-  document.getElementById("st-sounds-on").onclick = ()=>{ document.getElementById("st-sounds-on").classList.add("active"); document.getElementById("st-sounds-off").classList.remove("active"); };
-  document.getElementById("st-sounds-off").onclick = ()=>{ document.getElementById("st-sounds-off").classList.add("active"); document.getElementById("st-sounds-on").classList.remove("active"); };
-  document.getElementById("st-sounds-test").onclick = ()=> playTone("achieve");
+  document.getElementById("st-sounds-off").onclick = ()=>{ document.getElementById("st-sounds-off").classList.add("active"); document.getElementById("st-sounds-on").classList.remove("active"); document.getElementById("st-sound-cats").style.display="none"; };
+  document.getElementById("st-sounds-on").onclick = ()=>{ document.getElementById("st-sounds-on").classList.add("active"); document.getElementById("st-sounds-off").classList.remove("active"); document.getElementById("st-sound-cats").style.display="block"; };
+  document.getElementById("st-qh-on").onclick = ()=>{ document.getElementById("st-qh-on").classList.add("active"); document.getElementById("st-qh-off").classList.remove("active"); document.getElementById("st-qh-wrap").style.display="block"; };
+  document.getElementById("st-qh-off").onclick = ()=>{ document.getElementById("st-qh-off").classList.add("active"); document.getElementById("st-qh-on").classList.remove("active"); document.getElementById("st-qh-wrap").style.display="none"; };
+  document.getElementById("st-qh-bypass").onclick = (e)=> e.target.classList.toggle("active");
+  const pendingSoundPrefs = Object.assign({}, SETTINGS.soundPrefs||{});
+  document.querySelectorAll("[data-cat-group]").forEach(group=>{
+    const cat = group.dataset.catGroup;
+    group.querySelectorAll(".chip").forEach(chip=> chip.addEventListener("click", ()=>{
+      group.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
+      chip.classList.add("active");
+      pendingSoundPrefs[cat] = chip.dataset.style;
+    }));
+  });
+  document.querySelectorAll("[data-test-cat]").forEach(btn=> btn.addEventListener("click", ()=>{
+    const cat = btn.dataset.testCat;
+    const style = pendingSoundPrefs[cat] || "chime";
+    const kind = SOUND_STYLES[style];
+    if(kind) playTone(kind); else toast("This category is set to silent");
+  }));
   document.getElementById("st-save").onclick = async ()=>{
     SETTINGS.name = document.getElementById("st-name").value.trim();
     SETTINGS.currency = document.getElementById("st-currency").value.trim() || "KSh";
     SETTINGS.devPhone = document.getElementById("st-dev-phone").value.trim();
     SETTINGS.devEmail = document.getElementById("st-dev-email").value.trim();
     SETTINGS.aiOnline = document.getElementById("st-ai-on").classList.contains("active");
-    SETTINGS.anthropicKey = document.getElementById("st-ai-key").value.trim();
-    SETTINGS.supabaseUrl = document.getElementById("st-sb-url").value.trim();
-    SETTINGS.supabaseKey = document.getElementById("st-sb-key").value.trim();
     SETTINGS.shareProfileOnGoals = document.getElementById("st-share-profile").classList.contains("active");
     SETTINGS.soundsOn = document.getElementById("st-sounds-off").classList.contains("active") ? false : true;
-    SETTINGS.googleClientId = document.getElementById("st-google-id").value.trim();
+    SETTINGS.soundPrefs = pendingSoundPrefs;
+    SETTINGS.quietHoursOn = document.getElementById("st-qh-on").classList.contains("active");
+    SETTINGS.quietHoursStart = document.getElementById("st-qh-start").value || "22:00";
+    SETTINGS.quietHoursEnd = document.getElementById("st-qh-end").value || "06:00";
+    SETTINGS.quietHoursBypassFasting = document.getElementById("st-qh-bypass").classList.contains("active");
     await DB.put("settings", SETTINGS);
     closeSheet(); toast("Settings saved"); setTab(STATE.tab);
   };

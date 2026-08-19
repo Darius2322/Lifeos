@@ -160,6 +160,30 @@ function playTone(kind){
     });
   }catch(e){ /* Web Audio unavailable — sound is a nicety, never blocks the action */ }
 }
+// Per-category sound styles: each reminder-ish category (tasks, habits, goals,
+// fasting, money, debts, general) can be assigned one of these named styles
+// independently, so e.g. task pings sound different from bill reminders.
+const SOUND_STYLES = {chime:"success", ping:"tap", pulse:"alert", rise:"achieve", none:null};
+const SOUND_CATEGORIES = ["tasks","habits","goals","fasting","money","debts","general"];
+function playCategorySound(category){
+  const prefs = SETTINGS.soundPrefs || {};
+  const style = prefs[category] || "chime";
+  const kind = SOUND_STYLES[style];
+  if(kind) playTone(kind);
+}
+// Quiet hours: suppresses the OS notification popup + sound for non-critical
+// categories during the window, without losing the reminder — it still shows
+// up in the bell panel (gatherAlerts always computes live from real data, so
+// nothing needs a separate "deliver later" queue).
+function inQuietHours(){
+  if(!SETTINGS.quietHoursOn) return false;
+  const [sh,sm] = (SETTINGS.quietHoursStart||"22:00").split(":").map(Number);
+  const [eh,em] = (SETTINGS.quietHoursEnd||"06:00").split(":").map(Number);
+  const now = new Date();
+  const cur = now.getHours()*60 + now.getMinutes();
+  const start = sh*60+sm, end = eh*60+em;
+  return start<=end ? (cur>=start && cur<end) : (cur>=start || cur<end);
+}
 function el(html){ const t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstElementChild; }
 
 /* =========================================================================
@@ -903,7 +927,7 @@ async function renderPlan(){
 
   el2.querySelectorAll("[data-toggle]").forEach(n=> n.addEventListener("click", async (e)=>{
     e.stopPropagation(); const t = await DB.get("tasks", n.dataset.toggle); t.done=!t.done; t.completedAt = t.done? nowISO(): null; await DB.put("tasks", t);
-    if(t.done) playTone("success");
+    if(t.done) playCategorySound("tasks");
     renderPlan(); toast(t.done?"Task completed":"Marked incomplete");
   }));
   el2.querySelectorAll("[data-open]").forEach(n=> n.addEventListener("click", ()=> pushModule("form","tasks",n.dataset.open)));
@@ -1067,7 +1091,7 @@ async function renderGrow(){
   el2.querySelectorAll("[data-habit]").forEach(n=> n.addEventListener("click", async ()=>{
     const willComplete = !doneToday[n.dataset.habit];
     await toggleHabitToday(n.dataset.habit);
-    if(willComplete) playTone("complete");
+    if(willComplete) playCategorySound("habits");
     renderGrow();
   }));
   el2.querySelectorAll("[data-open]").forEach(n=>{ const [m,id]=n.dataset.open.split("|"); n.addEventListener("click", ()=>pushModule("form", m, id)); });
@@ -1147,11 +1171,6 @@ async function renderMore(){
       <div class="tile" data-review="weekly"><div class="em">${icon("doc",22)}</div><div class="l">Weekly review</div></div>
       <div class="tile" data-review="monthly"><div class="em">${icon("calendar",22)}</div><div class="l">Monthly review</div></div>
     </div>
-    <div class="section-label">Connections</div>
-    <div class="tile-grid">
-      <div class="tile" data-action="gdrive-setup"><div class="em">${icon("save",22)}</div><div class="l">Google Drive setup</div><div class="d">Backup to your own Drive</div></div>
-      <div class="tile" data-action="supabase-setup"><div class="em">${icon("link",22)}</div><div class="l">Supabase setup</div><div class="d">For Shared goals</div></div>
-    </div>
     <div class="section-label">System</div>
     <div class="tile-grid">
       <div class="tile" data-action="search"><div class="em">${icon("search",22)}</div><div class="l">Search</div><div class="d">Across everything</div></div>
@@ -1171,8 +1190,6 @@ async function renderMore(){
   el2.querySelector('[data-action="search"]').addEventListener("click", openSearch);
   el2.querySelector('[data-action="backup"]').addEventListener("click", openBackupSheet);
   el2.querySelector('[data-action="settings"]').addEventListener("click", openSettingsSheet);
-  el2.querySelector('[data-action="gdrive-setup"]').addEventListener("click", ()=>{ openSettingsSheet(); toast("Scroll to '☁️ Google Drive backup'"); });
-  el2.querySelector('[data-action="supabase-setup"]').addEventListener("click", ()=>{ openSettingsSheet(); toast("Scroll to '🔗 Shared goals'"); });
   el2.querySelector('[data-action="about"]').addEventListener("click", openAboutSheet);
   el2.querySelector('[data-action="whatsnew"]').addEventListener("click", ()=> openSheet(`
     <div class="sheet-title">✨ What's new in ${APP_VERSION}</div>
@@ -1319,7 +1336,7 @@ async function renderFastingScreen(el2){
       ring.style.strokeDashoffset = c - (pct/100)*c;
       if(remaining<=0 && !active.notifiedComplete){
         active.notifiedComplete = true;
-        fireNotification("⏱ Fasting goal reached", `Your ${active.plannedHours}h fast is complete — end it whenever you're ready.`, "fast-"+active.id, "achieve");
+        fireNotification("⏱ Fasting goal reached", `Your ${active.plannedHours}h fast is complete — end it whenever you're ready.`, "fast-"+active.id, "fasting");
       }
     };
     tick();
@@ -1338,7 +1355,7 @@ async function renderFastingScreen(el2){
     el2.querySelector("#fast-end").addEventListener("click", async ()=>{
       active.endTime = nowISO(); active.status = "completed";
       await DB.put("fastingSessions", active);
-      playTone("achieve"); toast("Fast complete — "+fmtDur(fastElapsedMs(active)));
+      playCategorySound("fasting"); toast("Fast complete — "+fmtDur(fastElapsedMs(active)));
       renderFastingScreen(el2);
     });
     el2.querySelector("#fast-cancel").addEventListener("click", async ()=>{
@@ -1405,7 +1422,7 @@ function fastHistoryHTML(completed){
 }
 /* ---------- Shared goals (optional Supabase sync) ----------
    Local-first as always: everything works and is visible on this device
-   without any setup. If SETTINGS.supabaseUrl/supabaseKey are filled in
+   without any setup. If CONFIG.supabaseUrl/supabaseKey are filled in
    (Settings → Shared goals), progress + member profiles sync through
    Supabase so anyone with the code — not just a spouse — sees the same
    result live, with only the name/photo/birthday each person opts to share. */
@@ -1446,10 +1463,10 @@ function loadSupabaseSDK(){
 }
 let sbClient = null;
 async function getSupabase(){
-  if(!SETTINGS.supabaseUrl || !SETTINGS.supabaseKey) return null;
+  if(!CONFIG.supabaseUrl || !CONFIG.supabaseKey) return null;
   if(sbClient) return sbClient;
   const sdk = await loadSupabaseSDK();
-  sbClient = sdk.createClient(SETTINGS.supabaseUrl, SETTINGS.supabaseKey);
+  sbClient = sdk.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey);
   return sbClient;
 }
 function genShareCode(){
@@ -1503,7 +1520,7 @@ async function fetchGoalMembers(code){
 async function renderSharedGoalsScreen(el2){
   checkSharedGoalNotices();
   const goals = await DB.getAll("sharedGoals");
-  const connected = !!(SETTINGS.supabaseUrl && SETTINGS.supabaseKey);
+  const connected = !!(CONFIG.supabaseUrl && CONFIG.supabaseKey);
   const membersByGoal = {};
   if(connected){ for(const g of goals){ if(g.linked) membersByGoal[g.id] = await fetchGoalMembers(g.shareCode); } }
   el2.innerHTML = `
@@ -1511,7 +1528,7 @@ async function renderSharedGoalsScreen(el2){
     <div class="card" style="background:linear-gradient(135deg, rgba(212,163,49,0.10), var(--panel) 60%);">
       <h2><span class="em">🔗</span>Shared goals</h2>
       <p style="font-size:12.5px; color:var(--fog); line-height:1.6; margin:0;">
-        ${connected? "Connected — anyone with a goal's code sees the same live progress, whether it's your wife, a friend, or a group." : `Not connected yet — works fully on this device already. To make it live across other people's phones, add a free Supabase project's URL + anon key in Settings.`}
+        ${connected? "Connected — anyone with a goal's code sees the same live progress, whether it's your wife, a friend, or a group." : `Not connected yet — works fully on this device already. Ask the developer to enable live sync across other people's phones.`}
       </p>
       ${connected? "" : `<button class="btn ghost sm" id="sg-view-sql" style="margin-top:10px;">🔧 View setup instructions</button>`}
     </div>
@@ -1546,12 +1563,12 @@ async function renderSharedGoalsScreen(el2){
   const sqlBtn = el2.querySelector("#sg-view-sql");
   if(sqlBtn) sqlBtn.addEventListener("click", ()=> openSheet(`
     <div class="sheet-title">🔧 Supabase setup</div>
-    <p style="font-size:12px; color:var(--fog);">Run this once in your Supabase project's SQL editor, then paste your project URL + anon key into Settings.</p>
+    <p style="font-size:12px; color:var(--fog);">Run this once in your Supabase project's SQL editor, then have the developer add your project URL + anon key to this deployment's config.js.</p>
     <pre style="font-size:10px; background:var(--panel-2); border-radius:8px; padding:10px; overflow-x:auto; color:var(--sage); white-space:pre-wrap;">${esc(SHARED_GOALS_SQL)}</pre>
   `));
   el2.querySelector("#sg-create").addEventListener("click", ()=> openCreateGoalSheet(el2));
   el2.querySelector("#sg-join").addEventListener("click", async ()=>{
-    if(!connected){ toast("Add your Supabase URL + key in Settings first"); return; }
+    if(!connected){ toast("Shared goals aren't connected on this install yet — ask the developer"); return; }
     const code = (prompt("Enter the 6-character code")||"").trim().toUpperCase();
     if(!code) return;
     try{
@@ -1592,7 +1609,7 @@ function openCreateGoalSheet(el2){
     const title = document.getElementById("sg-title").value.trim();
     const target = Number(document.getElementById("sg-target").value);
     if(!title || !target){ toast("Add a title and target"); return; }
-    const connected = !!(SETTINGS.supabaseUrl && SETTINGS.supabaseKey);
+    const connected = !!(CONFIG.supabaseUrl && CONFIG.supabaseKey);
     const code = genShareCode();
     const unit = type.unit();
     const g = {id:uid(), title, goalType:type.key, unit, targetAmount:target, currentAmount:0, shareCode:code, linked:false, achievedNotified:false, createdAt:nowISO()};
@@ -1637,7 +1654,7 @@ async function openContributeSheet(goalId){
     const nowAchieved = g.currentAmount >= g.targetAmount;
     await DB.put("sharedGoals", g);
     await DB.add("sharedGoalContributions", {id:uid(), goalId:g.id, amount:amt, who:SETTINGS.name||"Me", createdAt:nowISO()});
-    if(g.linked && SETTINGS.supabaseUrl && SETTINGS.supabaseKey){
+    if(g.linked && CONFIG.supabaseUrl && CONFIG.supabaseKey){
       try{
         const sb = await getSupabase();
         await sb.from("shared_goals").update({current_amount:g.currentAmount, achieved:nowAchieved}).eq("code", g.shareCode);
@@ -1645,7 +1662,7 @@ async function openContributeSheet(goalId){
       }catch(e){ /* stays correct locally; will be out of sync with others until back online */ }
     }
     closeSheet();
-    if(nowAchieved && !wasAchieved){ playTone("achieve"); toast("🎉 Goal achieved! "+g.title); }
+    if(nowAchieved && !wasAchieved){ playCategorySound("goals"); toast("🎉 Goal achieved! "+g.title); }
     else toast("Added — total is now "+g.currentAmount+" "+g.unit);
     if(STATE.stack[STATE.stack.length-1]?.module==="__sharedgoals__") renderModuleScreen();
   });
@@ -1654,7 +1671,7 @@ async function openContributeSheet(goalId){
 // about — a co-member's goal being achieved, or their birthday today — but
 // only using what that member chose to share (see shareProfileOnGoals).
 async function checkSharedGoalNotices(){
-  if(!SETTINGS.supabaseUrl || !SETTINGS.supabaseKey) return;
+  if(!CONFIG.supabaseUrl || !CONFIG.supabaseKey) return;
   const goals = await DB.getAll("sharedGoals");
   const today = todayStr().slice(5);
   for(const g of goals.filter(g=>g.linked)){
@@ -1662,13 +1679,13 @@ async function checkSharedGoalNotices(){
       const sb = await getSupabase();
       const {data: remote} = await sb.from("shared_goals").select().eq("code", g.shareCode).single();
       if(remote && remote.achieved && !g.achievedNotified){
-        fireNotification("🎉 Goal achieved!", `"${g.title}" just hit its target.`, "goal-"+g.id, "achieve");
+        fireNotification("🎉 Goal achieved!", `"${g.title}" just hit its target.`, "goal-"+g.id, "goals");
         g.achievedNotified = true; g.currentAmount = remote.current_amount; await DB.put("sharedGoals", g);
       }
       const members = await fetchGoalMembers(g.shareCode);
       for(const m of members){
         if(m.member_id===SETTINGS.deviceId || !m.share_birthday || !m.birthday) continue;
-        if(m.birthday.slice(5)===today) fireNotification("🎂 Birthday today", `${m.name} (from "${g.title}") has a birthday today.`, "bday-"+m.member_id+"-"+today, "success");
+        if(m.birthday.slice(5)===today) fireNotification("🎂 Birthday today", `${m.name} (from "${g.title}") has a birthday today.`, "bday-"+m.member_id+"-"+today, "general");
       }
     }catch(e){ /* silent — this is a best-effort background check */ }
   }
@@ -2826,7 +2843,7 @@ function openPhotoViewer(p, url, el2){
 let assistantMessages = [];
 async function renderAssistantScreen(el2){
   if(!assistantMessages.length){
-    const onlineNote = (SETTINGS.aiOnline && SETTINGS.anthropicKey) ? (navigator.onLine? " 🟢 Real AI is on right now — I can also add tasks or reminders if you ask me to." : " 🟡 Real AI is enabled but you're offline, so I'm using local answers only for now.") : "";
+    const onlineNote = (SETTINGS.aiOnline && CONFIG.anthropicKey) ? (navigator.onLine? " 🟢 Real AI is on right now — I can also add tasks or reminders if you ask me to." : " 🟡 Real AI is enabled but you're offline, so I'm using local answers only for now.") : "";
     assistantMessages.push({from:"bot", text:`Hey ${SETTINGS.name||"there"} 👋 I'm your Life OS assistant.${onlineNote} I only know what's stored in this app — no internet, no general knowledge unless online mode is on — so ask me things like "what's due today", "how much have I spent this month", "how's my gym routine going", "what did I eat today", or "when's my next period".`});
   }
   el2.innerHTML = `
@@ -2924,7 +2941,7 @@ function renderProposalCard(p, i){
     </div>`;
 }
 async function assistantRespond(qRaw){
-  if(SETTINGS.aiOnline && SETTINGS.anthropicKey && navigator.onLine){
+  if(SETTINGS.aiOnline && CONFIG.anthropicKey && navigator.onLine){
     try{
       const reply = await assistantRespondOnline(qRaw);
       if(reply) return reply;
@@ -2993,7 +3010,7 @@ async function assistantRespondOnline(qRaw){
     method:"POST",
     headers:{
       "Content-Type":"application/json",
-      "x-api-key": SETTINGS.anthropicKey,
+      "x-api-key": CONFIG.anthropicKey,
       "anthropic-version":"2023-06-01",
       "anthropic-dangerous-direct-browser-access":"true"
     },
@@ -3345,7 +3362,7 @@ async function openReview(type){
    SETTINGS
    ========================================================================= */
 function openBackupSheet(){
-  const gdConnected = !!SETTINGS.googleClientId;
+  const gdConnected = !!CONFIG.googleClientId;
   openSheet(`
     <div class="sheet-title">Backup & restore</div>
     <p style="font-size:13px; color:var(--fog); line-height:1.5;">Your data lives only in this browser/app install. Back it up regularly — clearing site data or reinstalling can erase it.</p>
@@ -3376,7 +3393,7 @@ function openBackupSheet(){
           <button class="btn ghost" id="bk-gd-restore">⬇️ Restore from Drive</button>
         </div>
         <p class="field-hint">Signs you into your own Google account each time (nothing stored on any server) and saves the same backup file to a private "Life OS" area of your Drive that only this app can see.</p>
-      ` : `<p class="field-hint">Needs a free Google OAuth Client ID — add one in Settings to enable one-tap backup to your own Drive instead of manual file export.</p>`}
+      ` : `<p class="field-hint">Not connected on this install — ask the developer to enable one-tap Google Drive backup. Manual export/restore from a file always works below either way.</p>`}
     </div>
   `);
   let mode = "merge";
@@ -3403,7 +3420,7 @@ function openBackupSheet(){
 /* ---------- Google Drive backup (optional) ----------
    Uses Google Identity Services + the drive.file scope, which only ever
    grants access to files this app itself created — never the rest of the
-   user's Drive. Needs SETTINGS.googleClientId, set once in Settings. */
+   user's Drive. Needs CONFIG.googleClientId, set once in Settings. */
 function loadGoogleIdentitySDK(){
   return new Promise((resolve, reject)=>{
     if(window.google && window.google.accounts) return resolve(window.google);
@@ -3416,11 +3433,11 @@ function loadGoogleIdentitySDK(){
 }
 function getGoogleAccessToken(){
   return new Promise(async (resolve, reject)=>{
-    if(!SETTINGS.googleClientId) return reject(new Error("No Google Client ID set in Settings"));
+    if(!CONFIG.googleClientId) return reject(new Error("Google Drive isn't connected on this install"));
     try{
       const google = await loadGoogleIdentitySDK();
       const client = google.accounts.oauth2.initTokenClient({
-        client_id: SETTINGS.googleClientId,
+        client_id: CONFIG.googleClientId,
         scope: "https://www.googleapis.com/auth/drive.file",
         callback: (resp)=> resp.access_token? resolve(resp.access_token) : reject(new Error("Sign-in was cancelled or failed"))
       });
@@ -3567,7 +3584,7 @@ function termsHTML(standalone){
     Because all data is stored only in this browser or app install (except for the optional features described in the Privacy Policy), you are solely responsible for backing up your data (via the Backup & Restore screen). The developer is not responsible for data loss caused by clearing browser/site data, uninstalling the app, device failure, or browser storage limits.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
-    If you enable the optional online AI Assistant, Shared goals, or Google Drive backup, you are responsible for the account/API key you provide and any costs or terms associated with that third-party service (Anthropic, Supabase, Google) — Life OS itself does not charge for these or act as an intermediary.
+    The online AI Assistant and Shared goals rely on third-party services (Anthropic, Supabase) configured by whoever deployed this install, who is responsible for those accounts and any associated costs. If you use Google Drive backup, you connect your own Google account and are responsible for that account and Google's terms. Life OS itself does not charge for any of these or act as an intermediary.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
     Fitness, reading, and journaling features are for personal record-keeping only and do not constitute medical, financial, or legal advice. Consult a qualified professional for decisions in those areas.
@@ -3591,7 +3608,7 @@ function privacyPolicyHTML(standalone){
     <b style="color:var(--paper);">By default:</b> no account creation, no analytics, no advertising SDKs, no tracking scripts. There is no backend — Vercel or any host serving these static files only serves the app's code, never your data.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
-    <b style="color:var(--paper);">Optional features that do send data, only if you turn them on:</b> the online AI Assistant (your question and a summary of your data go directly to Anthropic's API using your own API key); Shared goals (goal progress and, only if you opt in, your name/photo/birthday go to your own Supabase project); Google Drive backup (your backup file goes to your own Google Drive, using your own Google account). Each is off unless you explicitly configure it in Settings, and each sends data only to a service you control the credentials for — never to us.
+    <b style="color:var(--paper);">Optional features that do send data, only if this install has them enabled and you turn them on in Settings:</b> the online AI Assistant (your question and a summary of your data go directly to Anthropic's API); Shared goals (goal progress and, only if you opt in, your name/photo/birthday go to a Supabase project); Google Drive backup (your backup file goes to your own Google Drive, using your own Google account you sign into). The API/service credentials for the first two are configured by whoever deployed this install, not by you — you only control whether you personally use each feature.
     </p>
     <p style="font-size:12.5px; color:var(--fog); line-height:1.6;">
     <b style="color:var(--paper);">Device features:</b> notifications, fingerprint/Face ID unlock, and contact import use your browser's built-in APIs directly — no server involved. Contact import requires your explicit selection of each contact via your phone's native picker.
@@ -3780,8 +3797,13 @@ function startNotificationEngine(){
   checkDueNotifications();
   notifyInterval = setInterval(checkDueNotifications, 60000);
 }
-async function fireNotification(title, body, tag, soundKind){
-  playTone(soundKind||"alert");
+async function fireNotification(title, body, tag, category){
+  category = category || "general";
+  const bypass = category==="fasting" && SETTINGS.quietHoursBypassFasting!==false;
+  if(inQuietHours() && !bypass){
+    return; // still visible in the bell panel (computed live from real data) — just no popup/sound right now
+  }
+  playCategorySound(category);
   if(navigator.vibrate) navigator.vibrate([200,100,200]);
   if(Notification.permission!=="granted") return;
   const opts = {body, tag, vibrate:[200,100,200], icon:"./icon-192.png", badge:"./icon-192.png"};
@@ -3808,26 +3830,26 @@ async function checkDueNotifications(){
   const newlyNotified = [...notified];
   for(const r of reminders){
     if(!r.done && reminderOccursOn(r, today) && !notified.includes("rem-"+r.id)){
-      fireNotification("Reminder", r.title, "rem-"+r.id); newlyNotified.push("rem-"+r.id);
+      fireNotification("Reminder", r.title, "rem-"+r.id, "general"); newlyNotified.push("rem-"+r.id);
     }
   }
   for(const s of subs){
     if(s.nextPaymentDate===today && !notified.includes("sub-"+s.id)){
-      fireNotification("Payment due today", s.name+" • "+fmtMoney(s.amount), "sub-"+s.id); newlyNotified.push("sub-"+s.id);
+      fireNotification("Payment due today", s.name+" • "+fmtMoney(s.amount), "sub-"+s.id, "money"); newlyNotified.push("sub-"+s.id);
     }
   }
   for(const d of docs){
     const days = d.expiryDate? daysUntil(d.expiryDate): null;
     if(days===30 && !notified.includes("doc-"+d.id)){
-      fireNotification("Document expiring soon", d.name+" expires in 30 days", "doc-"+d.id); newlyNotified.push("doc-"+d.id);
+      fireNotification("Document expiring soon", d.name+" expires in 30 days", "doc-"+d.id, "general"); newlyNotified.push("doc-"+d.id);
     }
   }
   for(const c of contacts){
     if(c.birthday && c.birthday.slice(5)===today.slice(5) && !notified.includes("bday-"+c.id)){
-      fireNotification("Birthday today 🎂", c.name+"'s birthday", "bday-"+c.id); newlyNotified.push("bday-"+c.id);
+      fireNotification("Birthday today 🎂", c.name+"'s birthday", "bday-"+c.id, "general"); newlyNotified.push("bday-"+c.id);
     }
     if(c.nextFollowUp===today && !notified.includes("fu-"+c.id)){
-      fireNotification("Follow up", "Follow up with "+c.name, "fu-"+c.id); newlyNotified.push("fu-"+c.id);
+      fireNotification("Follow up", "Follow up with "+c.name, "fu-"+c.id, "general"); newlyNotified.push("fu-"+c.id);
     }
   }
   if(newlyNotified.length!==notified.length){
@@ -3845,14 +3867,14 @@ async function gatherAlerts(){
     DB.getAll("tasks"), DB.getAll("reminders"), DB.getAll("subscriptions"), DB.getAll("documents"), DB.getAll("contacts")
   ]);
   const out = [];
-  tasks.filter(t=>!t.done && t.dueDate && t.dueDate<today).forEach(t=> out.push({icon:"📝", title:t.title, sub:"Overdue • "+fmtDate(t.dueDate)}));
-  reminders.filter(r=>!r.done && reminderOccursOn(r, today)).forEach(r=> out.push({icon:"⏰", title:r.title, sub:"Today"}));
+  tasks.filter(t=>!t.done && t.dueDate && t.dueDate<today).forEach(t=> out.push({icon:"check", title:t.title, sub:"Overdue • "+fmtDate(t.dueDate)}));
+  reminders.filter(r=>!r.done && reminderOccursOn(r, today)).forEach(r=> out.push({icon:"bell", title:r.title, sub:"Today"}));
   subs.filter(s=> s.nextPaymentDate && daysUntil(s.nextPaymentDate)!=null && daysUntil(s.nextPaymentDate)>=0 && daysUntil(s.nextPaymentDate)<=3)
-    .forEach(s=> out.push({icon:"💳", title:s.name+" payment", sub: daysUntil(s.nextPaymentDate)===0?"Due today":"Due "+fmtDate(s.nextPaymentDate)}));
+    .forEach(s=> out.push({icon:"wallet", title:s.name+" payment", sub: daysUntil(s.nextPaymentDate)===0?"Due today":"Due "+fmtDate(s.nextPaymentDate)}));
   docs.filter(d=> d.expiryDate && daysUntil(d.expiryDate)!=null && daysUntil(d.expiryDate)>=0 && daysUntil(d.expiryDate)<=30)
-    .forEach(d=> out.push({icon:"📄", title:d.name+" expires soon", sub:fmtDate(d.expiryDate)}));
-  contacts.filter(c=> c.birthday && c.birthday.slice(5)===today.slice(5)).forEach(c=> out.push({icon:"🎂", title:c.name+"'s birthday", sub:"Today"}));
-  contacts.filter(c=> c.nextFollowUp===today).forEach(c=> out.push({icon:"👤", title:"Follow up with "+c.name, sub:"Today"}));
+    .forEach(d=> out.push({icon:"doc", title:d.name+" expires soon", sub:fmtDate(d.expiryDate)}));
+  contacts.filter(c=> c.birthday && c.birthday.slice(5)===today.slice(5)).forEach(c=> out.push({icon:"heart", title:c.name+"'s birthday", sub:"Today"}));
+  contacts.filter(c=> c.nextFollowUp===today).forEach(c=> out.push({icon:"user", title:"Follow up with "+c.name, sub:"Today"}));
   return out;
 }
 async function updateNotifBadge(){
@@ -3865,7 +3887,7 @@ async function openNotificationsPanel(){
     <div class="sheet-title">Notifications</div>
     ${!SETTINGS.notificationsOn? `<p style="font-size:12.5px; color:var(--fog); line-height:1.5;">Device sound & vibration are off. <span id="np-enable" style="color:var(--gold); font-weight:600; cursor:pointer;">Turn on</span></p>`:""}
     <div class="card" style="margin-top:10px;">
-      ${alerts.length? alerts.map(a=>`<div class="row"><div class="row-icon">${a.icon}</div><div class="row-body"><div class="row-title">${esc(a.title)}</div><div class="row-sub">${esc(a.sub)}</div></div></div>`).join("") : `<div class="empty"><span class="em">🔔</span><p>Nothing needs your attention right now.</p></div>`}
+      ${alerts.length? alerts.map(a=>`<div class="row"><div class="row-icon">${icon(a.icon,16)}</div><div class="row-body"><div class="row-title">${esc(a.title)}</div><div class="row-sub">${esc(a.sub)}</div></div></div>`).join("") : `<div class="empty">${icon("bell",26)}<p>Nothing needs your attention right now.</p></div>`}
     </div>
   `);
   const en = document.getElementById("np-enable");
@@ -4059,7 +4081,7 @@ async function init(){
   renderPinPad();
   renderLockExtras();
   if(SETTINGS.notificationsOn) startNotificationEngine();
-  if(SETTINGS.supabaseUrl && SETTINGS.supabaseKey) checkSharedGoalNotices();
+  if(CONFIG.supabaseUrl && CONFIG.supabaseKey) checkSharedGoalNotices();
   startUsageTracking();
   maybeAutoLogLocation();
   setTab("home");

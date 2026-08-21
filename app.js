@@ -19,6 +19,18 @@ function fmtDate(d){
   if(isNaN(dt)) return d;
   return dt.toLocaleDateString(undefined,{weekday:"short", day:"numeric", month:"short"});
 }
+function timeAgo(iso){
+  if(!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff/60000);
+  if(min<1) return "just now";
+  if(min<60) return min+"m ago";
+  const hr = Math.floor(min/60);
+  if(hr<24) return hr+"h ago";
+  const day = Math.floor(hr/24);
+  if(day<7) return day+"d ago";
+  return new Date(iso).toLocaleDateString(undefined,{day:"numeric", month:"short"});
+}
 function daysUntil(d){
   if(!d) return null;
   const dt = new Date(d+"T00:00:00"), t = new Date(todayStr()+"T00:00:00");
@@ -104,7 +116,8 @@ const ICONS = {
   pause:'<rect x="7" y="5" width="3.2" height="14" rx="1"/><rect x="13.8" y="5" width="3.2" height="14" rx="1"/>',
   play:'<path d="M7 4.5v15l13-7.5z"/>',
   stop:'<rect x="5" y="5" width="14" height="14" rx="2"/>',
-  graduation:'<path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/><path d="M22 9v6"/>'
+  graduation:'<path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/><path d="M22 9v6"/>',
+  focus:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6" fill="currentColor"/>'
 };
 function icon(name, size){
   size = size||18;
@@ -914,6 +927,7 @@ async function renderPlan(){
       <div class="plan-hero-stat" data-open-list="reminders"><div class="n">${todaysReminders.length+laterReminders.length}</div><div class="l">Reminders</div></div>
       <button class="plan-hero-cal" id="plan-cal-btn">${icon("calendar",18)}<span>Calendar</span></button>
     </div>
+    <button class="btn ghost" id="plan-focus-btn" style="margin-bottom:14px; display:flex; align-items:center; justify-content:center; gap:8px;">${icon("focus",16)} Focus mode</button>
     ${weekTasks.length? `<div class="card" style="padding:12px 14px; margin-bottom:14px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <span style="font-size:12px; color:var(--fog); font-weight:600;">This week</span>
@@ -951,7 +965,7 @@ async function renderPlan(){
 
     <div class="section-label">Notes ${doneCount?`<span style="color:var(--fog-dim); text-transform:none; letter-spacing:0;">· ${doneCount} tasks completed all-time</span>`:''}</div>
     <div class="card-grid" id="plan-notes-preview"></div>
-    <button class="btn ghost" data-openmod="notes">Open all notes</button>
+    <button class="btn ghost" data-openmod="__notes__">Open all notes</button>
   `;
 
   const notes = (await DB.getAll("notes")).sort((a,b)=>(b.updatedAt||"")<(a.updatedAt||"")?-1:1).slice(0,4);
@@ -989,6 +1003,7 @@ async function renderPlan(){
   el2.querySelectorAll("[data-openmod]").forEach(n=> n.addEventListener("click", ()=> pushModule("list", n.dataset.openmod, null)));
   el2.querySelectorAll("[data-open-list]").forEach(n=> n.addEventListener("click", ()=> pushModule("list", n.dataset.openList, null)));
   el2.querySelector("#plan-cal-btn").addEventListener("click", ()=> pushModule("list", "__calendar__", null));
+  el2.querySelector("#plan-focus-btn").addEventListener("click", ()=> pushModule("list", "__focus__", null));
 }
 
 /* =========================================================================
@@ -1194,6 +1209,7 @@ async function renderMore(){
     <div class="section-label">Track</div>
     <div class="tile-grid">
       <div class="tile" data-custom="__fasting__"><div class="em">${icon("timer",22)}</div><div class="l">Fasting</div></div>
+      <div class="tile" data-custom="__focus__"><div class="em">${icon("focus",22)}</div><div class="l">Focus mode</div></div>
       <div class="tile" data-open="learning"><div class="em">${icon("graduation",22)}</div><div class="l">Learning</div></div>
       <div class="tile" data-open="foodLogs"><div class="em">${icon("bowl",22)}</div><div class="l">Diet</div></div>
       <div class="tile" data-open="gymRoutines"><div class="em">${icon("gym",22)}</div><div class="l">Gym routines</div></div>
@@ -1302,7 +1318,9 @@ const CUSTOM_SCREENS = {
   "__assistant__": {label:"Assistant", render:renderAssistantScreen},
   "__household__": {label:"Household budget", render:renderHouseholdScreen},
   "__sharedgoals__": {label:"Shared goals", render:renderSharedGoalsScreen},
-  "__fasting__": {label:"Fasting", render:renderFastingScreen}
+  "__fasting__": {label:"Fasting", render:renderFastingScreen},
+  "__focus__": {label:"Focus mode", render:renderFocusScreen},
+  "__notes__": {label:"Notes", render:renderNotesScreen}
 };
 /* ---------- Fasting ----------
    Fully local, no backend needed. A session's status moves
@@ -1469,6 +1487,149 @@ function fastHistoryHTML(completed){
       </div>`;
     }).join("")}
   </div>`;
+}
+/* ---------- Focus Mode ----------
+   Shows one task at a time with a countdown timer. Fully local — a focus
+   session is just a timed log entry, no different in spirit from a fasting
+   session, so it reuses the same countdown-ring UI pattern. */
+const FOCUS_PRESETS = [15,25,45,60];
+let focusTimerHandle = null;
+async function renderFocusScreen(el2){
+  clearInterval(focusTimerHandle);
+  const sessions = await DB.getAll("focusSessions");
+  const active = sessions.find(s=>s.status==="active"||s.status==="paused");
+  const completedToday = sessions.filter(s=>s.status==="completed" && s.startTime.slice(0,10)===todayStr());
+  const totalMinToday = completedToday.reduce((s,x)=> s + Math.round((new Date(x.endTime)-new Date(x.startTime))/60000), 0);
+
+  if(active){
+    const plannedMs = active.durationMin*60000;
+    el2.innerHTML = `
+      <button class="detail-back" data-back>← Back</button>
+      <div class="card" style="text-align:center; padding:22px 16px;">
+        <div style="font-size:11px; color:var(--fog); letter-spacing:1.5px; text-transform:uppercase; font-weight:700;">${active.status==="paused"?"Paused":"Focusing on"}</div>
+        <div style="font-size:16px; font-weight:600; color:var(--paper); margin:8px 0 4px;">${esc(active.title)}</div>
+        <div style="position:relative; width:190px; height:190px; margin:14px auto;">
+          <svg width="190" height="190" style="transform:rotate(-90deg);">
+            <circle cx="95" cy="95" r="82" fill="none" stroke="var(--panel-2)" stroke-width="9"/>
+            <circle id="focus-ring" cx="95" cy="95" r="82" fill="none" stroke="${active.status==='paused'?'var(--fog-dim)':'var(--blue)'}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${2*Math.PI*82}" style="transition:stroke-dashoffset 1s linear;"/>
+          </svg>
+          <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            <div id="focus-remaining" style="font-family:var(--font-mono); font-size:28px; font-weight:700; color:var(--paper);">--:--</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" id="focus-toggle">${active.status==="paused"?icon("play",16)+" Resume":icon("pause",16)+" Pause"}</button>
+          <button class="btn" id="focus-stop">${icon("stop",16)} End session</button>
+        </div>
+      </div>
+      ${focusHistoryHTML(completedToday, totalMinToday)}
+    `;
+    const tick = ()=>{
+      const remEl = document.getElementById("focus-remaining");
+      if(!remEl){ clearInterval(focusTimerHandle); return; }
+      const elapsed = fastElapsedMs(active); // reuses the same paused-aware elapsed calc as Fasting
+      const remaining = Math.max(0, plannedMs - elapsed);
+      const pct = Math.min(100, (elapsed/plannedMs)*100);
+      const mm = Math.floor(remaining/60000), ss = Math.floor((remaining%60000)/1000);
+      remEl.textContent = `${mm}:${String(ss).padStart(2,"0")}`;
+      const ring = document.getElementById("focus-ring");
+      const c = 2*Math.PI*82;
+      ring.style.strokeDashoffset = c - (pct/100)*c;
+      if(remaining<=0 && active.status==="active" && !active.notifiedComplete){
+        active.notifiedComplete = true;
+        active.status = "completed"; active.endTime = nowISO();
+        DB.put("focusSessions", active);
+        playCategorySound("tasks");
+        fireNotification("🎯 Focus session complete", `"${active.title}" — ${active.durationMin} min done.`, "focus-"+active.id, "tasks");
+        toast("Focus session complete ✓");
+        renderFocusScreen(el2);
+      }
+    };
+    tick();
+    focusTimerHandle = setInterval(tick, 1000);
+    el2.querySelector("[data-back]").addEventListener("click", popModule);
+    el2.querySelector("#focus-toggle").addEventListener("click", async ()=>{
+      if(active.status==="paused"){
+        active.totalPausedMs = (active.totalPausedMs||0) + (Date.now() - new Date(active.pausedAt).getTime());
+        active.pausedAt = null; active.status = "active";
+      } else {
+        active.pausedAt = nowISO(); active.status = "paused";
+      }
+      await DB.put("focusSessions", active);
+      renderFocusScreen(el2);
+    });
+    el2.querySelector("#focus-stop").addEventListener("click", async ()=>{
+      active.endTime = nowISO(); active.status = "completed";
+      await DB.put("focusSessions", active);
+      playCategorySound("tasks"); toast("Session ended");
+      renderFocusScreen(el2);
+    });
+    return;
+  }
+
+  const activeTasks = (await DB.getAll("tasks")).filter(t=>!t.done);
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <div class="card">
+      <div class="form-head"><div class="form-head-icon" style="background:var(--blue);">${icon("focus",20)}</div><h2>Start focusing</h2></div>
+      <label>What are you working on?</label>
+      <input id="focus-title" placeholder="Task title" list="focus-task-list">
+      <datalist id="focus-task-list">${activeTasks.map(t=>`<option value="${esc(t.title)}">`).join("")}</datalist>
+      <label>Duration</label>
+      <div class="chip-grid" id="focus-presets">
+        ${FOCUS_PRESETS.map((m,i)=>`<div class="chip-select ${i===1?'active':''}" data-min="${m}">${m} min</div>`).join("")}
+      </div>
+      <button class="btn" id="focus-start" style="margin-top:16px;">${icon("play",16)} Start focus session</button>
+    </div>
+    ${focusHistoryHTML(completedToday, totalMinToday)}
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  let picked = 25;
+  el2.querySelectorAll("#focus-presets .chip-select").forEach(chip=> chip.addEventListener("click", ()=>{
+    el2.querySelectorAll("#focus-presets .chip-select").forEach(c=>c.classList.remove("active"));
+    chip.classList.add("active"); picked = Number(chip.dataset.min);
+  }));
+  el2.querySelector("#focus-start").addEventListener("click", async ()=>{
+    const title = document.getElementById("focus-title").value.trim();
+    if(!title){ toast("What are you focusing on?"); return; }
+    const matchedTask = activeTasks.find(t=>t.title===title);
+    await DB.add("focusSessions", {id:uid(), title, taskId:matchedTask?matchedTask.id:null, durationMin:picked, startTime:nowISO(), endTime:null, status:"active", totalPausedMs:0, pausedAt:null, notifiedComplete:false, createdAt:nowISO()});
+    playTone("tap");
+    renderFocusScreen(el2);
+  });
+}
+function focusHistoryHTML(completedToday, totalMinToday){
+  return `<div class="section-label">Today ${completedToday.length?`<span style="color:var(--fog-dim); text-transform:none; letter-spacing:0;">· ${completedToday.length} session${completedToday.length===1?"":"s"}, ${totalMinToday} min total</span>`:""}</div>
+  ${completedToday.length? `<div class="card-grid">${completedToday.map(s=>`
+    <div class="grid-card"><div class="gc-title">${esc(s.title)}</div><div class="gc-sub">${s.durationMin} min planned</div></div>
+  `).join("")}</div>` : `<div class="empty">${icon("focus",26)}<p>No focus sessions yet today.</p></div>`}`;
+}
+/* ---------- Notes ----------
+   A nicer presentation than the generic list — a masonry-style card grid
+   with a rotating accent color, so a page of saved notes actually looks
+   like something worth writing in, not a plain settings-style list. */
+const NOTE_ACCENTS = ["var(--gold)","var(--sage)","var(--blue)","var(--violet)","var(--clay)"];
+async function renderNotesScreen(el2){
+  const notes = (await DB.getAll("notes")).sort((a,b)=>(b.updatedAt||b.createdAt||"")<(a.updatedAt||a.createdAt||"")?-1:1);
+  el2.innerHTML = `
+    <button class="detail-back" data-back>← Back</button>
+    <div class="form-head" style="margin-bottom:14px;"><div class="form-head-icon" style="background:var(--violet);">${icon("note",20)}</div><h2>Notes</h2></div>
+    ${notes.length? `<div class="notes-grid">
+      ${notes.map((n,i)=>{
+        const tags = (n.tags||"").split(",").map(t=>t.trim()).filter(Boolean);
+        return `<div class="note-card" style="--accent:${NOTE_ACCENTS[i%NOTE_ACCENTS.length]};" data-id="${n.id}">
+          <div class="nc-title">${esc(n.title)}</div>
+          <div class="nc-body">${esc(n.body||"")}</div>
+          ${tags.length? `<div class="nc-tags">${tags.map(t=>`<span class="nc-tag">${esc(t)}</span>`).join("")}</div>`:""}
+          <div class="nc-date">${timeAgo(n.updatedAt||n.createdAt)}</div>
+        </div>`;
+      }).join("")}
+    </div>` : `<div class="empty">${icon("note",30)}<p>No notes yet — tap below to write your first one.</p></div>`}
+    <button class="btn" id="notes-add" style="margin-top:16px;">+ New note</button>
+  `;
+  el2.querySelector("[data-back]").addEventListener("click", popModule);
+  el2.querySelectorAll(".note-card").forEach(card=> card.addEventListener("click", ()=> pushModule("form","notes",card.dataset.id)));
+  el2.querySelector("#notes-add").addEventListener("click", ()=> pushModule("form","notes",null));
 }
 /* ---------- Shared goals (optional Supabase sync) ----------
    Local-first as always: everything works and is visible on this device
@@ -3288,7 +3449,7 @@ const QUICK_ACTIONS = [
   {ic:"heart", l:"Relationship", mod:"relationships"}, {ic:"scale", l:"Body log", mod:"bodyLogs"},
   {ic:"image", l:"Photo", mod:"photo"}, {ic:"bowl", l:"Meal", mod:"foodLogs"},
   {ic:"gym", l:"Gym routine", mod:"gymRoutines"}, {ic:"timer", l:"Start a fast", mod:"fasting"},
-  {ic:"graduation", l:"Learning item", mod:"learning"}
+  {ic:"graduation", l:"Learning item", mod:"learning"}, {ic:"focus", l:"Focus mode", mod:"focus"}
 ];
 function openQuickAdd(){
   openSheet(`
@@ -3304,6 +3465,7 @@ function openQuickAdd(){
     if(n.dataset.mod==="trip"){ pushModule("form","trips",null); return; }
     if(n.dataset.mod==="photo"){ pushModule("list","__photos__",null); return; }
     if(n.dataset.mod==="fasting"){ pushModule("list","__fasting__",null); return; }
+    if(n.dataset.mod==="focus"){ pushModule("list","__focus__",null); return; }
     pushModule("form", n.dataset.mod, null);
   }));
 }
@@ -3847,6 +4009,40 @@ function startNotificationEngine(){
   checkDueNotifications();
   notifyInterval = setInterval(checkDueNotifications, 60000);
 }
+// Fasting/Focus elapsed time is always computed from real timestamps (start
+// time vs now), never from an incrementing counter — so it stays accurate
+// even if the tab was backgrounded or the phone was locked for hours. What
+// this adds is catching the *completion notification* even when the
+// Fasting/Focus screen itself isn't the one currently open, by checking
+// periodically and whenever the app becomes visible again. Honesty check:
+// none of this fires while the browser/app is fully closed — a static PWA
+// with no push server can't wake up in that state; the moment you reopen
+// it, though, the notification fires immediately and the timer is correct.
+let timerCheckInterval = null;
+async function checkActiveTimers(){
+  try{
+    const [fasts, focuses] = await Promise.all([DB.getAll("fastingSessions"), DB.getAll("focusSessions")]);
+    const activeFast = fasts.find(s=>s.status==="active");
+    if(activeFast && fastElapsedMs(activeFast) >= activeFast.plannedHours*3600000 && !activeFast.notifiedComplete){
+      activeFast.notifiedComplete = true;
+      await DB.put("fastingSessions", activeFast);
+      fireNotification("⏱ Fasting goal reached", `Your ${activeFast.plannedHours}h fast is complete — end it whenever you're ready.`, "fast-"+activeFast.id, "fasting");
+    }
+    const activeFocus = focuses.find(s=>s.status==="active");
+    if(activeFocus && fastElapsedMs(activeFocus) >= activeFocus.durationMin*60000 && !activeFocus.notifiedComplete){
+      activeFocus.notifiedComplete = true;
+      activeFocus.status = "completed"; activeFocus.endTime = nowISO();
+      await DB.put("focusSessions", activeFocus);
+      fireNotification("🎯 Focus session complete", `"${activeFocus.title}" — ${activeFocus.durationMin} min done.`, "focus-"+activeFocus.id, "tasks");
+    }
+  }catch(e){ /* best-effort — never blocks the rest of the app */ }
+}
+function startTimerWatcher(){
+  if(timerCheckInterval) return;
+  checkActiveTimers();
+  timerCheckInterval = setInterval(checkActiveTimers, 20000);
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") checkActiveTimers(); });
+}
 async function fireNotification(title, body, tag, category){
   category = category || "general";
   const bypass = category==="fasting" && SETTINGS.quietHoursBypassFasting!==false;
@@ -4131,6 +4327,7 @@ async function init(){
   renderPinPad();
   renderLockExtras();
   if(SETTINGS.notificationsOn) startNotificationEngine();
+  startTimerWatcher();
   if(CONFIG.supabaseUrl && CONFIG.supabaseKey) checkSharedGoalNotices();
   startUsageTracking();
   maybeAutoLogLocation();

@@ -5,8 +5,16 @@ const CONFIG = window.LIFEOS_CONFIG || {};
 /* =========================================================================
    DATABASE LAYER — IndexedDB, versioned, generic CRUD. Everything local.
    ========================================================================= */
-const APP_VERSION = "1.19.1";
+const APP_VERSION = "1.20.1";
 const CHANGELOG = [
+  {version:"1.20.1", changes:[
+    "Fasting and Focus completion alerts now catch up automatically — checked every 20s and whenever you reopen the app, not just while that specific screen is open",
+    "Notes redesigned — a proper card layout with a colored accent, tag pills, and a 'time ago' stamp instead of a plain list"
+  ]},
+  {version:"1.20.0", changes:[
+    "New: Focus Mode — pick a task, choose 15/25/45/60 min (or it remembers what you type), get a countdown ring with pause/resume, a completion sound + notification, and a log of today's sessions",
+    "Focus mode is reachable from Plan, Quick Add, and More → Track"
+  ]},
   {version:"1.19.1", changes:[
     "Plan tab's Today section is now a real timeline — tasks and reminders due today merge into Morning/Afternoon/Evening groups, sorted by time",
     "Tasks can now optionally have a time, not just a date",
@@ -117,7 +125,7 @@ const CHANGELOG = [
   ]}
 ];
 const DB_NAME = "lifeos";
-const DB_VERSION = 10;
+const DB_VERSION = 11;
 // Phase 2 adds: inventory, documents (blob vault), contacts, reading, workouts,
 // travel (trips/itinerary/expenses), places/bucket list, timeline, importantDates.
 // Phase 3 adds: sleep log, on-device app-usage log, location log.
@@ -173,7 +181,8 @@ const STORES = [
   {name:"sharedGoals", key:"id"},
   {name:"sharedGoalContributions", key:"id", indexes:["goalId"]},
   {name:"fastingSessions", key:"id", indexes:["startTime","status"]},
-  {name:"learningItems", key:"id", indexes:["status"]}
+  {name:"learningItems", key:"id", indexes:["status"]},
+  {name:"focusSessions", key:"id", indexes:["startTime","taskId"]}
 ];
 
 const DB = {
